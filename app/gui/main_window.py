@@ -60,7 +60,7 @@ class MainWindow(ctk.CTk):
                 # PhotoImage for iconphoto. Keep a reference so it survives GC.
                 from PIL import ImageTk
 
-                self._icon_ref = ImageTk.PhotoImage(icon.light_image)
+                self._icon_ref = ImageTk.PhotoImage(icon.pil_image)
                 self.iconphoto(True, self._icon_ref)
             except Exception:
                 pass  # window icon is best-effort (ERR-12)
