@@ -98,3 +98,18 @@ def test_empty_history_is_friendly_zero():
 def test_custom_xp_rate_flows_into_stats():
     stats = compute_stats([_session(30)], Settings(xp_per_10_minutes=20), today=TODAY)
     assert stats.today.xp == 60
+
+
+def test_total_notes_counts_supplied_notes():
+    from app.core.models import Note
+
+    notes = [Note.create(title="a", now=datetime.combine(TODAY, datetime.min.time())),
+             Note.create(title="b", day=TODAY,
+                         now=datetime.combine(TODAY, datetime.min.time()))]
+    stats = compute_stats([_session(30)], Settings(), today=TODAY, notes=notes)
+    assert stats.total_notes == 2
+
+
+def test_total_notes_defaults_to_zero_without_notes_arg():
+    stats = compute_stats([_session(30)], Settings(), today=TODAY)
+    assert stats.total_notes == 0

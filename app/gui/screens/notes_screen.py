@@ -7,7 +7,9 @@ notes also appear on that day in the Calendar and in the day-details
 dialog.
 
 Layout: list of notes on the left (with search + New note button), full
-text of the selected note on the right with Edit / Delete actions.
+text of the selected note on the right with Edit / Delete actions; the
+note's day and "Updated …" timestamp appear at the bottom-right of the
+detail pane, next to the Delete button.
 """
 
 from __future__ import annotations
@@ -68,19 +70,15 @@ class NotesScreen(BaseScreen):
         self.detail_frame.grid_columnconfigure(0, weight=1)
         self.detail_frame.grid_rowconfigure(1, weight=1)
 
+        # Title only. The date / "updated" info used to sit in a second
+        # label on this same grid row; with long titles the wrapped title
+        # and the subtitle overlapped each other. The updated timestamp now
+        # lives in the bottom action row next to Delete instead.
         self.detail_title = ctk.CTkLabel(
             self.detail_frame, text="",
             font=ctk.CTkFont(size=17, weight="bold"), anchor="w", wraplength=460,
         )
-        self.detail_title.grid(row=0, column=0, sticky="ew", padx=16, pady=(14, 2))
-
-        self.detail_subtitle = ctk.CTkLabel(
-            self.detail_frame, text="",
-            font=ctk.CTkFont(size=12), anchor="w", justify="left",
-            text_color=("gray40", "gray65"), wraplength=460,
-        )
-        self.detail_subtitle.grid(row=0, column=0, sticky="ew",
-                                  padx=16, pady=(0, 6))
+        self.detail_title.grid(row=0, column=0, sticky="ew", padx=16, pady=(14, 6))
 
         self.detail_body = ctk.CTkTextbox(
             self.detail_frame, font=ctk.CTkFont(size=13), wrap="word",
@@ -101,6 +99,15 @@ class NotesScreen(BaseScreen):
         self.open_day_button = ctk.CTkButton(
             actions, text="Open day", width=100, fg_color="gray30",
             hover_color="gray25", command=self._open_day_of_selected)
+        # Date / "Updated …" info sits at the bottom-right of the action
+        # row (next to Delete) instead of under the title, where it used to
+        # collide with long wrapped titles.
+        self.detail_meta = ctk.CTkLabel(
+            actions, text="",
+            font=ctk.CTkFont(size=12), anchor="e", justify="right",
+            text_color=("gray40", "gray65"),
+        )
+        self.detail_meta.pack(side="right")
 
         self.detail_empty = self.show_empty_state(
             self.detail_frame,
@@ -248,29 +255,29 @@ class NotesScreen(BaseScreen):
         note = self._selected_note()
         if note is None:
             self.detail_title.grid_forget()
-            self.detail_subtitle.grid_forget()
             self.detail_body.grid_forget()
             self.detail_empty.grid_forget()
             self.detail_empty.place(relx=0.5, rely=0.5, anchor="center")
             self.edit_button.configure(state="disabled")
             self.delete_button.configure(state="disabled")
-            self.open_day_button.grid_forget()
+            self.open_day_button.pack_forget()
+            self.detail_meta.pack_forget()
             return
 
         self.detail_empty.place_forget()
         self.detail_empty.grid_forget()
         self.detail_title.grid(row=0, column=0, sticky="ew",
-                               padx=16, pady=(14, 2))
+                               padx=16, pady=(14, 6))
         self.detail_body.grid(row=1, column=0, sticky="nsew", padx=16)
 
-        subtitle_parts = []
+        meta_parts = []
         if note.day is not None:
-            subtitle_parts.append(format_date_long(note.day))
-        subtitle_parts.append(f"Updated {note.updated_at_local:%Y-%m-%d %H:%M}")
-        self.detail_subtitle.grid(row=0, column=0, sticky="ew",
-                                  padx=16, pady=(0, 6))
+            meta_parts.append(format_date_long(note.day))
+        meta_parts.append(
+            f"Updated {note.updated_at_local:%Y-%m-%d %H:%M}")
+        self.detail_meta.pack(side="right")
+        self.detail_meta.configure(text="   ·   ".join(meta_parts))
         self.detail_title.configure(text=note.display_title())
-        self.detail_subtitle.configure(text="   ·   ".join(subtitle_parts))
 
         self.detail_body.configure(state="normal")
         self.detail_body.delete("1.0", "end")

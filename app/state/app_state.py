@@ -353,4 +353,5 @@ class AppState:
         return compute_stats(
             self.dataset.sessions, self.dataset.settings,
             today=date.today(), day_index=self._day_index,
+            notes=self.dataset.notes,
         )
