@@ -25,6 +25,21 @@ def delete_session(state: AppState, session_id: str) -> ActionResult:
     return state.delete_session(session_id)
 
 
+def create_note(state: AppState, title: str, body: str = "",
+                day=None) -> ActionResult:
+    return state.create_note(title, body, day=day)
+
+
+def update_note(state: AppState, note_id: str, title: str, body: str,
+                day=None) -> ActionResult:
+    return state.update_note(note_id, title, body, day=day)
+
+
+def delete_note(state: AppState, note_id: str) -> ActionResult:
+    """Delete after GUI-level confirmation."""
+    return state.delete_note(note_id)
+
+
 def change_theme(state: AppState, theme: str) -> ActionResult:
     return state.set_theme(theme)
 

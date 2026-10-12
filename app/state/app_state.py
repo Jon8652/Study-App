@@ -12,13 +12,20 @@ sessions.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 from typing import Callable
 
 from app.core.date_rules import sessions_for_day
 from app.core.medals import DayAggregate, build_day_aggregates
-from app.core.models import Dataset, Session, Settings
+from app.core.models import (
+    Dataset,
+    MAX_NOTE_BODY_LENGTH,
+    MAX_NOTE_TITLE_LENGTH,
+    Note,
+    Session,
+    Settings,
+)
 from app.core.stats import StatsResult, compute_stats
 from app.persistence import repository
 from app.persistence.schema import SaveError
@@ -165,7 +172,56 @@ class AppState:
         # Autosave after any data-changing action (FR-57).
         self.autosave()
 
-    # -- daily index (Part L optimization) --------------------------------------
+    # -- note mutations ---------------------------------------------------------
+
+    def create_note(self, title: str, body: str = "",
+                    day: date | None = None) -> ActionResult:
+        """Create a saved note with its own title (optionally tied to a day)."""
+        title = (title or "").strip()[:MAX_NOTE_TITLE_LENGTH]
+        body = (body or "")[:MAX_NOTE_BODY_LENGTH]
+        if not title and not body.strip():
+            return ActionResult(ok=False,
+                                message="Give your note a title or some text "
+                                        "before saving.")
+        note = Note.create(title=title, body=body, day=day)
+        self.dataset.notes.append(note)
+        self._mark_dirty_and_save()
+        self._notify()
+        return ActionResult(ok=True, value=note)
+
+    def update_note(self, note_id: str, title: str, body: str,
+                    day: date | None = None) -> ActionResult:
+        """Edit an existing note's title/body/day and autosave."""
+        note = self.dataset.note_by_id(note_id)
+        if note is None:
+            return ActionResult(ok=False,
+                                message="That note could not be found.")
+        title = (title or "").strip()[:MAX_NOTE_TITLE_LENGTH]
+        body = (body or "")[:MAX_NOTE_BODY_LENGTH]
+        if not title and not body.strip():
+            return ActionResult(ok=False,
+                                message="Give your note a title or some text "
+                                        "before saving.")
+        note.title = title
+        note.body = body
+        note.day = day
+        note.updated_at_local = datetime.now()
+        self._mark_dirty_and_save()
+        self._notify()
+        return ActionResult(ok=True, value=note)
+
+    def delete_note(self, note_id: str) -> ActionResult:
+        """Delete a note permanently and autosave."""
+        note = self.dataset.note_by_id(note_id)
+        if note is None:
+            return ActionResult(ok=False,
+                                message="That note could not be found.")
+        self.dataset.notes.remove(note)
+        self._mark_dirty_and_save()
+        self._notify()
+        return ActionResult(ok=True)
+
+    # -- derived views --------------------------------------------------------------
 
     def rebuild_index(self) -> None:
         """Rebuild the day-aggregate index from all sessions."""
@@ -267,7 +323,29 @@ class AppState:
             "total_minutes": aggregate.total_minutes if aggregate else 0,
             "total_xp": aggregate.total_xp if aggregate else 0,
             "medal": aggregate.medal if aggregate else None,
+            "notes": self.get_notes_for_day(day),
         }
+
+    # -- note views --------------------------------------------------------------
+
+    def get_all_notes(self) -> list[Note]:
+        """All notes, most recently updated first."""
+        return sorted(self.dataset.notes,
+                      key=lambda n: n.updated_at_local, reverse=True)
+
+    def get_notes_for_day(self, day: date) -> list[Note]:
+        """Notes attached to ``day``, newest first."""
+        matched = [n for n in self.dataset.notes if n.day == day]
+        matched.sort(key=lambda n: n.updated_at_local, reverse=True)
+        return matched
+
+    def get_note_counts_by_day(self) -> dict[date, int]:
+        """day -> number of notes; used by the calendar's notes indicator."""
+        counts: dict[date, int] = {}
+        for note in self.dataset.notes:
+            if note.day is not None:
+                counts[note.day] = counts.get(note.day, 0) + 1
+        return counts
 
     def get_stats(self) -> StatsResult:
         # Reuse the maintained daily index so stats stay fast with 10k+

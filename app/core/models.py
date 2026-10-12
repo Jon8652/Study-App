@@ -102,6 +102,52 @@ class Session:
         return total, None
 
 
+MAX_NOTE_TITLE_LENGTH = 120
+MAX_NOTE_BODY_LENGTH = 100_000
+
+
+@dataclass
+class Note:
+    """A titled free-text note, optionally attached to a calendar day.
+
+    Notes are stored alongside sessions in the dataset so they persist with
+    the normal autosave/backup flow. ``day`` is None for undated notes.
+    """
+
+    id: str
+    title: str
+    body: str = ""
+    day: date | None = None
+    created_at_local: datetime = field(default_factory=datetime.now)
+    updated_at_local: datetime = field(default_factory=datetime.now)
+
+    @classmethod
+    def create(cls, title: str, body: str = "",
+               day: date | None = None,
+               now: datetime | None = None) -> "Note":
+        moment = now if now is not None else datetime.now()
+        return cls(
+            id=str(uuid.uuid4()),
+            title=title.strip(),
+            body=body,
+            day=day,
+            created_at_local=moment,
+            updated_at_local=moment,
+        )
+
+    @staticmethod
+    def sanitize_text(value: Any, limit: int) -> str:
+        """Coerce to str and clamp length; never crash on odd payloads."""
+        if not isinstance(value, str):
+            value = str(value or "")
+        return value[:limit]
+
+    def display_title(self) -> str:
+        """Title with a friendly fallback when left blank."""
+        stripped = self.title.strip()
+        return stripped if stripped else "Untitled note"
+
+
 @dataclass
 class Settings:
     """User settings persisted in the save file (FR-73)."""
@@ -128,21 +174,28 @@ class Settings:
 
 @dataclass
 class Dataset:
-    """The full in-memory dataset: settings + sessions (single source of truth)."""
+    """The full in-memory dataset: settings + sessions + notes (single source of truth)."""
 
     settings: Settings = field(default_factory=Settings)
     sessions: list[Session] = field(default_factory=list)
+    notes: list[Note] = field(default_factory=list)
     created_at: datetime | None = None
     updated_at: datetime | None = None
 
     @classmethod
     def empty(cls, now: datetime | None = None) -> "Dataset":
         moment = now if now is not None else datetime.now()
-        return cls(settings=Settings(), sessions=[], created_at=moment,
+        return cls(settings=Settings(), sessions=[], notes=[], created_at=moment,
                    updated_at=moment)
 
     def session_by_id(self, session_id: str) -> Session | None:
         for session in self.sessions:
             if session.id == session_id:
                 return session
+        return None
+
+    def note_by_id(self, note_id: str) -> Note | None:
+        for note in self.notes:
+            if note.id == note_id:
+                return note
         return None

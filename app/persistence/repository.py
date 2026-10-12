@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from app.constants import SCHEMA_VERSION
-from app.core.models import Dataset, Session
+from app.core.models import Dataset, Note, Session
 from app.persistence import backup as backup_ops
 from app.persistence.schema import (
     CorruptFileError,
@@ -64,6 +64,17 @@ def dataset_to_payload(dataset: Dataset) -> dict[str, Any]:
                 "source": s.source,
             }
             for s in dataset.sessions
+        ],
+        "notes": [
+            {
+                "id": n.id,
+                "title": n.title,
+                "body": n.body,
+                "day": n.day.isoformat() if n.day else None,
+                "created_at_local": format_dt(n.created_at_local),
+                "updated_at_local": format_dt(n.updated_at_local),
+            }
+            for n in dataset.notes
         ],
     }
 
