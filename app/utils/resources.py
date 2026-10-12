@@ -36,14 +36,15 @@ def asset_exists(key: str) -> bool:
 
 
 def load_photo(key: str, size: int | None = None):
-    """Load an asset as a tkinter-compatible PhotoImage, or return None.
+    """Load an asset as a customtkinter-compatible CTkImage, or return None.
 
-    Uses Pillow when available for scaling; falls back gracefully when the
-    asset file is missing or cannot be decoded. The returned image object is
-    cached so it stays referenced for the lifetime of the process.
+    Uses Pillow to build a ``CTkImage`` (proper High-DPI scaling for ctk
+    widgets). Falls back gracefully when the asset file is missing or cannot
+    be decoded. The returned image object is cached so it stays referenced
+    for the lifetime of the process.
 
-    Returns an object usable by both tkinter and customtkinter widgets, or
-    ``None`` when unavailable (callers must then use a text fallback).
+    Returns an object usable by customtkinter widgets, or ``None`` when
+    unavailable (callers must then use a text fallback).
     """
     filename = ASSET_FILENAMES.get(key)
     if filename is None:
@@ -58,25 +59,17 @@ def load_photo(key: str, size: int | None = None):
         return None
 
     try:
-        from PIL import Image, ImageTk
+        from PIL import Image
+
+        import customtkinter as ctk
 
         with Image.open(path) as img:
             img = img.convert("RGBA")
             if size is not None:
                 img = img.resize((size, size), Image.LANCZOS)
-            photo = ImageTk.PhotoImage(img)
+            photo = ctk.CTkImage(light_image=img, dark_image=img, image_size=(img.width, img.height))
     except Exception:
-        try:
-            # Plain tkinter PNG support (Tk >= 8.6) without Pillow
-            import tkinter as tk
-
-            photo = tk.PhotoImage(file=str(path))
-            if size is not None:
-                factor = max(1, round(photo.width() / max(size, 1)))
-                if factor > 1:
-                    photo = photo.subsample(factor, factor)
-        except Exception:
-            return None
+        return None
 
     _IMAGE_CACHE[cache_name] = photo
     return photo

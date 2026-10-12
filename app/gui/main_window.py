@@ -29,11 +29,13 @@ from app.utils.paths import get_default_save_path
 from app.utils.resources import load_photo
 
 NAV_ITEMS = (
-    ("home", "Home"),
-    ("calendar", "Calendar"),
-    ("stats", "Statistics"),
-    ("settings", "Settings"),
+    ("home", "Home", "home_icon"),
+    ("calendar", "Calendar", "calendar_icon"),
+    ("stats", "Statistics", "stats_icon"),
+    ("settings", "Settings", "settings_icon"),
 )
+
+NAV_ICONS_LIGHT = ("gray20", "gray85")  # text color tuple for inactive buttons
 
 
 class MainWindow(ctk.CTk):
@@ -51,8 +53,12 @@ class MainWindow(ctk.CTk):
         icon = load_photo("app_icon", size=64)
         if icon is not None:
             try:
-                self._icon_ref = icon
-                self.iconphoto(True, icon)
+                # CTkImage exposes the underlying PIL image; tkinter needs a
+                # PhotoImage for iconphoto. Keep a reference so it survives GC.
+                from PIL import ImageTk
+
+                self._icon_ref = ImageTk.PhotoImage(icon.light_image)
+                self.iconphoto(True, self._icon_ref)
             except Exception:
                 pass  # window icon is best-effort (ERR-12)
 
@@ -70,13 +76,20 @@ class MainWindow(ctk.CTk):
         brand.pack(pady=(20, 18), padx=10)
 
         self._nav_buttons: dict[str, ctk.CTkButton] = {}
-        for key, label in NAV_ITEMS:
+        self._nav_icon_refs: dict[str, object] = {}
+        for key, label, icon_key in NAV_ITEMS:
             button = ctk.CTkButton(
-                self.sidebar, text=label, height=40, anchor="w",
+                self.sidebar, text=f"  {label}", height=40, anchor="w",
                 fg_color="transparent", hover_color=("gray75", "gray25"),
                 font=ctk.CTkFont(size=14),
                 command=lambda k=key: self.show_screen(k),
             )
+            # Part J task 3: nav icons when the asset is available; the text
+            # label always remains, so missing icons never break navigation.
+            icon = load_photo(icon_key, size=18)
+            if icon is not None:
+                self._nav_icon_refs[key] = icon
+                button.configure(image=icon)
             button.pack(fill="x", padx=10, pady=2)
             self._nav_buttons[key] = button
 
