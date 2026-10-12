@@ -39,6 +39,9 @@ class AppState:
     def __init__(self, dataset: Dataset | None = None):
         self.dataset: Dataset = dataset or Dataset.empty()
         self._day_index: dict[date, DayAggregate] = {}
+        # day -> list of sessions attributed to that day (Part L): keeps
+        # add/delete index maintenance O(sessions-that-day), not O(history).
+        self._sessions_by_day: dict[date, list[Session]] = {}
         self._listeners: list[Callable[[], None]] = []
         self.dirty: bool = False
         self.rebuild_index()
@@ -169,11 +172,16 @@ class AppState:
         self._day_index = build_day_aggregates(
             self.dataset.sessions, self.dataset.settings.xp_per_10_minutes
         )
+        by_day: dict[date, list[Session]] = {}
+        for session in self.dataset.sessions:
+            by_day.setdefault(session.day, []).append(session)
+        self._sessions_by_day = by_day
 
     def _index_add(self, session: Session) -> None:
         day = session.day
         rate = self.dataset.settings.xp_per_10_minutes
         xp = (session.duration_minutes // 10) * rate
+        self._sessions_by_day.setdefault(day, []).append(session)
         existing = self._day_index.get(day)
         if existing is None:
             from app.core.medals import medal_for_minutes
@@ -210,19 +218,21 @@ class AppState:
 
         remaining_ids = tuple(sid for sid in existing.session_ids
                               if sid != session.id)
+        day_sessions = self._sessions_by_day.get(day, [])
+        day_sessions = [s for s in day_sessions if s.id != session.id]
+        if day_sessions:
+            self._sessions_by_day[day] = day_sessions
+        else:
+            self._sessions_by_day.pop(day, None)
         if not remaining_ids:
             del self._day_index[day]
             return
         rate = self.dataset.settings.xp_per_10_minutes
-        total_minutes = existing.total_minutes - session.duration_minutes
+        total_minutes = sum(s.duration_minutes for s in day_sessions)
         # XP must be recomputed from the *remaining* sessions: partial
         # 10-minute blocks make XP non-additive, so simple subtraction of
         # the removed session's XP would be wrong (e.g. days of 10+10+5).
-        remaining = [
-            s for s in self.dataset.sessions
-            if s.day == day and s.id != session.id
-        ]
-        total_xp = sum((s.duration_minutes // 10) * rate for s in remaining)
+        total_xp = sum((s.duration_minutes // 10) * rate for s in day_sessions)
         self._day_index[day] = dc_replace(
             existing,
             total_minutes=total_minutes,
@@ -260,6 +270,9 @@ class AppState:
         }
 
     def get_stats(self) -> StatsResult:
+        # Reuse the maintained daily index so stats stay fast with 10k+
+        # sessions (Part L).
         return compute_stats(
-            self.dataset.sessions, self.dataset.settings, today=date.today()
+            self.dataset.sessions, self.dataset.settings,
+            today=date.today(), day_index=self._day_index,
         )
