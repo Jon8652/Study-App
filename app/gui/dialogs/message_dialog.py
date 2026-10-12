@@ -5,10 +5,6 @@ from __future__ import annotations
 import customtkinter as ctk
 
 
-class MessageDialog(ctk.CTkinterDialog if hasattr(ctk, "CTkinterDialog") else object):
-    pass  # placeholder to avoid confusion; real implementation below
-
-
 def show_message(parent, title: str, message: str) -> None:
     """Show a friendly modal information dialog (non-technical wording)."""
     dialog = ctk.CTkToplevel(parent)
