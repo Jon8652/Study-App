@@ -27,11 +27,17 @@ def qualifying_days(sessions: Iterable) -> set[date]:
     return qualifying
 
 
-def current_streak(sessions: Iterable, today: date | None = None) -> int:
-    """Count consecutive qualifying days ending today or yesterday (FR-48)."""
+def current_streak(sessions: Iterable, today: date | None = None,
+                   qualifying: set[date] | None = None) -> int:
+    """Count consecutive qualifying days ending today or yesterday (FR-48).
+
+    ``qualifying`` may be precomputed (e.g. from the daily aggregate index)
+    to avoid an extra full-history pass (Part L).
+    """
     if today is None:
         today = date.today()
-    qualifying = qualifying_days(sessions)
+    if qualifying is None:
+        qualifying = qualifying_days(sessions)
     if not qualifying:
         return 0
 
@@ -50,9 +56,15 @@ def current_streak(sessions: Iterable, today: date | None = None) -> int:
     return streak
 
 
-def longest_streak(sessions: Iterable) -> int:
-    """Maximum consecutive qualifying days across all history (FR-49)."""
-    qualifying = sorted(qualifying_days(sessions))
+def longest_streak(sessions: Iterable,
+                   qualifying: set[date] | None = None) -> int:
+    """Maximum consecutive qualifying days across all history (FR-49).
+
+    ``qualifying`` may be precomputed (Part L).
+    """
+    if qualifying is None:
+        qualifying = qualifying_days(sessions)
+    qualifying = sorted(qualifying)
     if not qualifying:
         return 0
 

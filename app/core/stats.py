@@ -16,7 +16,8 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import Iterable
 
-from app.core.date_rules import group_sessions_by_day
+from app.constants import STREAK_QUALIFYING_MIN_MINUTES
+from app.core.date_rules import session_day
 from app.core.medals import BRONZE, GOLD, SILVER, build_day_aggregates
 from app.core.models import Session, Settings
 from app.core.streaks import current_streak, longest_streak
@@ -62,14 +63,20 @@ def compute_stats(
     sessions: Iterable[Session],
     settings: Settings | None = None,
     today: date | None = None,
+    day_index: dict[date, DayAggregate] | None = None,
 ) -> StatsResult:
-    """Compute all statistics for the given sessions."""
+    """Compute all statistics for the given sessions.
+
+    ``day_index`` (Part L): an already-maintained daily aggregate index may
+    be supplied to skip rebuilding aggregates from the full session list.
+    """
     sessions = list(sessions)
     xp_rate = settings.xp_per_10_minutes if settings else 10
     if today is None:
         today = date.today()
 
-    aggregates = build_day_aggregates(sessions, xp_rate)
+    aggregates = day_index if day_index is not None \
+        else build_day_aggregates(sessions, xp_rate)
 
     # Fast per-day lookup of (minutes, xp)
     day_map: dict[date, tuple[int, int]] = {
@@ -90,13 +97,17 @@ def compute_stats(
     total_xp = sum(x for _, x in day_map.values())
     result.lifetime = PeriodTotals(minutes=total_minutes, xp=total_xp)
 
-    result.current_streak_days = current_streak(sessions, today=today)
-    result.longest_streak_days = longest_streak(sessions)
+    # Active day = at least one logged session attributed to that day (FR-50).
+    # Streaks and active-day count derive from the aggregate index directly
+    # so no extra full-history grouping passes are needed (Part L).
+    qualifying = {day for day, (m, _) in day_map.items()
+                  if m >= STREAK_QUALIFYING_MIN_MINUTES}
+    result.current_streak_days = current_streak(sessions, today=today,
+                                                qualifying=qualifying)
+    result.longest_streak_days = longest_streak(sessions, qualifying=qualifying)
 
     result.total_sessions = len(sessions)
-    # Active day = at least one logged session attributed to that day (FR-50)
-    grouped = group_sessions_by_day(sessions)
-    result.active_days = len(grouped)
+    result.active_days = len(day_map)
     if result.active_days:
         result.average_daily_minutes = total_minutes / result.active_days
 
