@@ -39,12 +39,15 @@ NAV_ICONS_LIGHT = ("gray20", "gray85")  # text color tuple for inactive buttons
 
 
 class MainWindow(ctk.CTk):
-    def __init__(self, state: AppState | None = None):
+    # NOTE: `state` is a reserved Tkinter attribute (window deiconify/iconic
+    # status, used by customtkinter's DPI-scaling tracker). The app state must
+    # never be assigned to that name on a Tk widget — use `_app_state`.
+    def __init__(self, app_state: AppState | None = None):
         super().__init__()
         ctk.set_appearance_mode("dark")  # A-10: dark default before load
         ctk.set_default_color_theme("blue")
 
-        self.state = state or AppState()
+        self._app_state = app_state or AppState()
 
         self.title(WINDOW_TITLE)
         self.geometry(f"{WINDOW_WIDTH}x{WINDOW_HEIGHT}")
@@ -100,17 +103,17 @@ class MainWindow(ctk.CTk):
 
         # --- screens (created once, cached) ------------------------------------
         self.screens: dict[str, object] = {}
-        self.screens["home"] = HomeScreen(self.content_area, self.state)
-        self.screens["calendar"] = CalendarScreen(self.content_area, self.state)
-        self.screens["stats"] = StatsScreen(self.content_area, self.state)
+        self.screens["home"] = HomeScreen(self.content_area, self._app_state)
+        self.screens["calendar"] = CalendarScreen(self.content_area, self._app_state)
+        self.screens["stats"] = StatsScreen(self.content_area, self._app_state)
         self.screens["settings"] = SettingsScreen(
-            self.content_area, self.state, on_theme_change=self.apply_theme
+            self.content_area, self._app_state, on_theme_change=self.apply_theme
         )
         for screen in self.screens.values():
             screen.grid(row=0, column=0, sticky="nsew")
 
         # Any data change refreshes every screen at once.
-        self.state.add_listener(self.refresh_all)
+        self._app_state.add_listener(self.refresh_all)
 
         self.current_screen_key: str | None = None
         self.show_screen("home")
@@ -150,10 +153,10 @@ class MainWindow(ctk.CTk):
         - Future schema version: warn and refuse to modify the file (FR-72).
         """
         try:
-            outcome = self.state.load_startup()
+            outcome = self._app_state.load_startup()
         except FutureSchemaError:
-            self.state.dataset = type(self.state.dataset).empty()
-            self.state.rebuild_index()
+            self._app_state.dataset = type(self._app_state.dataset).empty()
+            self._app_state.rebuild_index()
             self.after(200, lambda: show_message(
                 self, "Newer data file", FRIENDLY_MESSAGES["future_schema"]))
             return
@@ -163,7 +166,7 @@ class MainWindow(ctk.CTk):
                 self, "Heads up", FRIENDLY_MESSAGES["started_empty"]))
             return
 
-        self.apply_theme(self.state.settings.theme)
+        self.apply_theme(self._app_state.settings.theme)
         self.refresh_all()
 
         if outcome.notice:
@@ -173,8 +176,8 @@ class MainWindow(ctk.CTk):
 
     def _on_close(self) -> None:
         """Flush unsaved changes before exiting (FR-58), then quit."""
-        if self.state.dirty:
-            result = self.state.autosave()
+        if self._app_state.dirty:
+            result = self._app_state.autosave()
             if not result.ok:
                 show_message(self, "Couldn't save", result.message or "")
         self.destroy()

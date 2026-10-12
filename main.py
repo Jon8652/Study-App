@@ -22,7 +22,7 @@ def main() -> int:
     from app.gui.main_window import MainWindow
     from app.state.app_state import AppState
 
-    app = MainWindow(state=AppState())
+    app = MainWindow(app_state=AppState())
     app.run_startup_load()
     app.mainloop()
     return 0
