@@ -29,7 +29,12 @@ class NotesScreen(BaseScreen):
         super().__init__(master, state, title="Notes")
 
         self._selected_note_id: str | None = None
-        self._note_rows: dict[str, ctk.CTkButton] = {}
+        # NOTE: we intentionally do NOT keep references to the per-note row
+        # buttons. customtkinter's CTkButton can raise AttributeError in
+        # destroy() (missing '_font' attribute) on some versions when a
+        # partially-constructed button is torn down; holding refs doesn't
+        # help and stale refs cause "dead widget" errors after refresh().
+        # Rows are recreated from scratch on every render instead.
 
         # --- toolbar -----------------------------------------------------------
         toolbar = ctk.CTkFrame(self.content, fg_color="transparent")
@@ -178,10 +183,30 @@ class NotesScreen(BaseScreen):
             if query in n.display_title().lower() or query in n.body.lower()
         ]
 
+    def _clear_children(self, frame) -> None:
+        """Safely destroy every child of *frame*.
+
+        customtkinter widgets can raise AttributeError inside ``destroy()``
+        (e.g. "'CTkButton' object has no attribute '_font'" on some ctk
+        versions when a widget was only partially constructed).  That used
+        to abort the whole refresh, leaving stale rows behind and making
+        search/delete/new notes appear broken.  Swallow per-widget teardown
+        errors so the list is always rebuilt correctly; also forget any
+        tkinter-level children first so they stop receiving events even if
+        their Python-side destroy fails.
+        """
+        for child in frame.winfo_children():
+            try:
+                child.forget()
+            except Exception:
+                pass
+            try:
+                child.destroy()
+            except Exception:
+                pass
+
     def _render_list(self) -> None:
-        for child in self.list_frame.winfo_children():
-            child.destroy()
-        self._note_rows.clear()
+        self._clear_children(self.list_frame)
 
         notes = self._filtered_notes()
         if not notes:
@@ -203,16 +228,21 @@ class NotesScreen(BaseScreen):
             if preview:
                 text += f"\n{preview}"
             selected = note.id == self._selected_note_id
+            # NOTE: CTkButton has no `justify` option — passing one raises
+            # ValueError in its __init__ *after* the widget is half-created,
+            # which used to abort _render_list() mid-way. That left a broken,
+            # empty notes list (new notes never appeared) AND caused the
+            # "'CTkButton' object has no attribute '_font'" AttributeError on
+            # the next refresh when those half-built buttons were destroyed.
             row = ctk.CTkButton(
                 self.list_frame, text=text, anchor="w",
-                justify="left", height=54, corner_radius=8,
+                height=54, corner_radius=8,
                 fg_color="gray25" if selected else "gray18",
                 hover_color="gray25",
                 font=ctk.CTkFont(size=13),
                 command=lambda nid=note.id: self._select(nid),
             )
             row.pack(fill="x", padx=6, pady=3)
-            self._note_rows[note.id] = row
 
     def _render_detail(self) -> None:
         note = self._selected_note()
@@ -251,7 +281,11 @@ class NotesScreen(BaseScreen):
         self.edit_button.configure(state="normal")
         self.delete_button.configure(state="normal")
         if note.day is not None:
-            self.open_day_button.grid(side="left", padx=(16, 0))
+            # NOTE: `side` is a pack option, not a grid option — passing it
+            # to grid() raised TclError ("bad option -side") and broke note
+            # selection. The button lives inside the packed `actions` frame,
+            # so pack it like its siblings.
+            self.open_day_button.pack(side="left", padx=(16, 0))
             self.open_day_button.configure(state="normal")
         else:
-            self.open_day_button.grid_forget()
+            self.open_day_button.pack_forget()

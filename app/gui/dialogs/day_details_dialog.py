@@ -111,8 +111,14 @@ class DayDetailsDialog(ctk.CTkToplevel):
             text=f"Medal: {medal_label(medal)}" if medal else "No medal yet"
         )
 
+        # Safe teardown: customtkinter widgets can raise AttributeError
+        # inside destroy() on some versions; never let that abort refresh.
         for child in self.list_frame.winfo_children():
-            child.destroy()
+            try:
+                child.forget()
+                child.destroy()
+            except Exception:
+                pass
 
         if not sessions:
             self.empty_label.pack(pady=(0, 10))
@@ -131,7 +137,11 @@ class DayDetailsDialog(ctk.CTkToplevel):
 
     def _render_notes(self, notes) -> None:
         for child in self.notes_frame.winfo_children():
-            child.destroy()
+            try:
+                child.forget()
+                child.destroy()
+            except Exception:
+                pass
 
         if not notes:
             self.no_notes_label.pack(pady=(0, 4))
