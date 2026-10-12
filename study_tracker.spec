@@ -37,7 +37,17 @@ a = Analysis(
     pathex=[],
     binaries=[],
     datas=[('assets', 'assets')],
-    hiddenimports=['customtkinter', 'PIL.ImageTk', 'platformdirs'],
+    hiddenimports=[
+        'customtkinter',
+        'platformdirs',
+        # Pillow <-> Tkinter bridge. PyInstaller's analysis misses these lazy
+        # imports, which crashes iconphoto() in the frozen build.
+        'PIL.ImageTk',
+        'PIL._imagingtk',
+        'PIL._tkinter_finder',
+        'PIL.ImageDraw',
+        'PIL.ImageFont',
+    ],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

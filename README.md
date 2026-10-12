@@ -95,7 +95,7 @@ app/state/              AppState: single source of truth + incremental index
 app/gui/                MainWindow, screens (home/calendar/stats/settings),
                         dialogs, widgets (medal badge, summary card)
 app/utils/              paths (source vs frozen resources), asset loader
-assets/               PNG icons & medal images (placeholder art)
+assets/               PNG icons & medal images (user artwork, any size/mode)
 tests/                  unit tests + GUI smoke test
 scripts/perf_check.py   Part L performance validation
 ```
