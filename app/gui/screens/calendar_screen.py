@@ -91,7 +91,12 @@ class CalendarScreen(BaseScreen):
     def _render(self) -> None:
         for child in self.grid_frame.winfo_children():
             if getattr(child, "_is_day_cell", False):
-                child.destroy()
+                # Safe teardown: customtkinter widgets can raise
+                # AttributeError inside destroy() on some versions.
+                try:
+                    child.destroy()
+                except Exception:
+                    pass
         self._cells.clear()
 
         month_name = pycal.month_name[self._month]
