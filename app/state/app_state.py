@@ -214,12 +214,19 @@ class AppState:
             del self._day_index[day]
             return
         rate = self.dataset.settings.xp_per_10_minutes
-        xp = (session.duration_minutes // 10) * rate
         total_minutes = existing.total_minutes - session.duration_minutes
+        # XP must be recomputed from the *remaining* sessions: partial
+        # 10-minute blocks make XP non-additive, so simple subtraction of
+        # the removed session's XP would be wrong (e.g. days of 10+10+5).
+        remaining = [
+            s for s in self.dataset.sessions
+            if s.day == day and s.id != session.id
+        ]
+        total_xp = sum((s.duration_minutes // 10) * rate for s in remaining)
         self._day_index[day] = dc_replace(
             existing,
             total_minutes=total_minutes,
-            total_xp=existing.total_xp - xp,
+            total_xp=total_xp,
             medal=medal_for_minutes(total_minutes),
             session_ids=remaining_ids,
         )
