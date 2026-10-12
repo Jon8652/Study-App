@@ -69,6 +69,7 @@ class StatsScreen(BaseScreen):
         add_card(activity_row, "sessions", "Total sessions")
         add_card(activity_row, "active_days", "Active days")
         add_card(activity_row, "average", "Avg daily time")
+        add_card(activity_row, "notes", "Total notes")
 
         for row_frame in (time_row, xp_row, streak_row, medal_row, activity_row):
             for col in range(4):
@@ -120,6 +121,7 @@ class StatsScreen(BaseScreen):
         cards["active_days"].set_value(str(stats.active_days), "Active days")
         avg = round(stats.average_daily_minutes)
         cards["average"].set_value(format_minutes(avg), "Average daily time")
+        cards["notes"].set_value(str(stats.total_notes), "Total notes")
 
         if stats.total_sessions == 0:
             self.empty_label.pack(fill="x", pady=(8, 4))
