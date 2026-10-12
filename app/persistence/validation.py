@@ -8,11 +8,18 @@ versions raise FutureSchemaError (FR-72).
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 from app.constants import SCHEMA_VERSION, SOURCE_CUSTOM, SOURCE_PRESET
-from app.core.models import Dataset, Session, Settings
+from app.core.models import (
+    Dataset,
+    MAX_NOTE_BODY_LENGTH,
+    MAX_NOTE_TITLE_LENGTH,
+    Note,
+    Session,
+    Settings,
+)
 from app.persistence.schema import CorruptFileError, FutureSchemaError
 from app.utils.date_utils import parse_dt
 
@@ -75,12 +82,40 @@ def validate_payload(payload: Any) -> tuple[Dataset, list[str]]:
 
         warnings.append(FRIENDLY_MESSAGES["partial_sessions"])
 
+    # --- notes (optional section; missing/invalid entries are skipped) --------
+    raw_notes = payload.get("notes")
+    if raw_notes is None:
+        raw_notes = []
+    if not isinstance(raw_notes, list):
+        raise CorruptFileError("Save file's note list is damaged.")
+
+    notes: list[Note] = []
+    notes_skipped = 0
+    seen_note_ids: set[str] = set()
+    for record in raw_notes:
+        note = _parse_note(record)
+        if note is None:
+            notes_skipped += 1
+            continue
+        if note.id in seen_note_ids:
+            notes_skipped += 1
+            continue
+        seen_note_ids.add(note.id)
+        notes.append(note)
+
+    if notes_skipped:
+        from app.persistence.schema import FRIENDLY_MESSAGES
+
+        if FRIENDLY_MESSAGES["partial_sessions"] not in warnings:
+            warnings.append(FRIENDLY_MESSAGES["partial_sessions"])
+
     created_at = _parse_optional_dt(payload.get("created_at"))
     updated_at = _parse_optional_dt(payload.get("updated_at"))
 
     dataset = Dataset(
         settings=settings,
         sessions=sessions,
+        notes=notes,
         created_at=created_at or datetime.now(),
         updated_at=updated_at,
     )
@@ -137,6 +172,47 @@ def _parse_session(record: Any) -> Session | None:
             duration_minutes=duration,
             created_at_local=created,
             source=source,
+        )
+    except Exception:
+        return None
+
+
+def _parse_note(record: Any) -> Note | None:
+    """Parse one note record; return None when unusable (ERR-10 style)."""
+    if not isinstance(record, dict):
+        return None
+
+    nid = record.get("id")
+    if not isinstance(nid, str) or not nid.strip():
+        return None
+
+    title = Note.sanitize_text(record.get("title", ""), MAX_NOTE_TITLE_LENGTH)
+    body = Note.sanitize_text(record.get("body", ""), MAX_NOTE_BODY_LENGTH)
+
+    day: date | None = None
+    raw_day = record.get("day")
+    if raw_day:
+        # Notes store a plain ISO date ("YYYY-MM-DD"); accept datetime too.
+        parsed_dt = parse_dt(raw_day)
+        if parsed_dt is not None:
+            day = parsed_dt.date()
+
+    created = _parse_optional_dt(record.get("created_at_local"))
+    updated = _parse_optional_dt(record.get("updated_at_local"))
+    now = datetime.now()
+    if created is None:
+        created = updated or now
+    if updated is None:
+        updated = created
+
+    try:
+        return Note(
+            id=nid.strip(),
+            title=title,
+            body=body,
+            day=day,
+            created_at_local=created,
+            updated_at_local=updated,
         )
     except Exception:
         return None

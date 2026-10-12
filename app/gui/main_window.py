@@ -21,6 +21,7 @@ from app.constants import (
 from app.gui.dialogs.message_dialog import show_message
 from app.gui.screens.calendar_screen import CalendarScreen
 from app.gui.screens.home_screen import HomeScreen
+from app.gui.screens.notes_screen import NotesScreen
 from app.gui.screens.settings_screen import SettingsScreen
 from app.gui.screens.stats_screen import StatsScreen
 from app.persistence.schema import FRIENDLY_MESSAGES, FutureSchemaError
@@ -31,6 +32,7 @@ from app.utils.resources import load_photo
 NAV_ITEMS = (
     ("home", "Home", "home_icon"),
     ("calendar", "Calendar", "calendar_icon"),
+    ("notes", "Notes", "notes_icon"),
     ("stats", "Statistics", "stats_icon"),
     ("settings", "Settings", "settings_icon"),
 )
@@ -115,6 +117,7 @@ class MainWindow(ctk.CTk):
         self.screens: dict[str, object] = {}
         self.screens["home"] = HomeScreen(self.content_area, self._app_state)
         self.screens["calendar"] = CalendarScreen(self.content_area, self._app_state)
+        self.screens["notes"] = NotesScreen(self.content_area, self._app_state)
         self.screens["stats"] = StatsScreen(self.content_area, self._app_state)
         self.screens["settings"] = SettingsScreen(
             self.content_area, self._app_state, on_theme_change=self.apply_theme

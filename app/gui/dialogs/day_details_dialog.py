@@ -1,9 +1,10 @@
 """Day-details modal dialog (Part G).
 
-Shows the selected date, total study time, XP, medal, and the session list
-with per-session delete buttons. Deletion requires confirmation; after any
-delete the dialog refreshes itself and AppState notifies all screens so
-calendar/home/stats update immediately (FR-15).
+Shows the selected date, total study time, XP, medal, the session list with
+per-session delete buttons, and any notes attached to that day. Deletion
+requires confirmation; after any change the dialog refreshes itself and
+AppState notifies all screens so calendar/home/stats/notes update
+immediately (FR-15).
 """
 
 from __future__ import annotations
@@ -14,6 +15,7 @@ import customtkinter as ctk
 
 from app.core.medals import medal_label
 from app.gui.dialogs.confirm_dialog import ask_yes_no
+from app.gui.dialogs.note_editor_dialog import NoteEditorDialog
 from app.gui.widgets.medal_badge import MedalBadge
 from app.gui.widgets.session_row import SessionRow
 from app.state.app_state import AppState
@@ -28,8 +30,8 @@ class DayDetailsDialog(ctk.CTkToplevel):
 
         self.title("Day details")
         self.transient(master)
-        self.geometry("560x480")
-        self.minsize(460, 380)
+        self.geometry("600x560")
+        self.minsize(480, 420)
 
         container = ctk.CTkFrame(self, corner_radius=0)
         container.pack(fill="both", expand=True, padx=8, pady=8)
@@ -49,7 +51,7 @@ class DayDetailsDialog(ctk.CTkToplevel):
         self.medal_text_label.pack(side="left", padx=(4, 0))
 
         self.list_frame = ctk.CTkScrollableFrame(container, label_text="Sessions")
-        self.list_frame.pack(fill="both", expand=True, padx=8, pady=(4, 8))
+        self.list_frame.pack(fill="both", expand=True, padx=8, pady=(4, 4))
 
         self.empty_label = ctk.CTkLabel(
             container,
@@ -58,6 +60,31 @@ class DayDetailsDialog(ctk.CTkToplevel):
             font=ctk.CTkFont(size=13),
             text_color=("gray40", "gray65"),
             justify="center",
+        )
+
+        # --- Notes for this day -------------------------------------------------
+        notes_header = ctk.CTkFrame(container, fg_color="transparent")
+        notes_header.pack(fill="x", padx=10, pady=(2, 2))
+        ctk.CTkLabel(
+            notes_header, text="Notes",
+            font=ctk.CTkFont(size=14, weight="bold"), anchor="w",
+        ).pack(side="left")
+        ctk.CTkButton(
+            notes_header, text="+ Add note", width=96, height=26,
+            command=self._add_note,
+        ).pack(side="right")
+
+        self.notes_frame = ctk.CTkScrollableFrame(
+            container, fg_color="transparent", height=140,
+        )
+        self.notes_frame.pack(fill="x", padx=8, pady=(0, 6))
+
+        self.no_notes_label = ctk.CTkLabel(
+            container,
+            text="No notes for this day yet. Use “Add note” to write one.",
+            font=ctk.CTkFont(size=12),
+            text_color=("gray40", "gray65"),
+            justify="left",
         )
 
         ctk.CTkButton(container, text="Close", width=100, fg_color="gray30",
@@ -89,15 +116,82 @@ class DayDetailsDialog(ctk.CTkToplevel):
 
         if not sessions:
             self.empty_label.pack(pady=(0, 10))
-            return
-        self.empty_label.pack_forget()
+        else:
+            self.empty_label.pack_forget()
+            xp_rate = self._state.settings.xp_per_10_minutes
+            for session in sessions:
+                SessionRow(
+                    self.list_frame, session, xp_rate,
+                    on_delete=self._confirm_delete,
+                ).pack(fill="x", padx=4, pady=3)
 
-        xp_rate = self._state.settings.xp_per_10_minutes
-        for session in sessions:
-            SessionRow(
-                self.list_frame, session, xp_rate,
-                on_delete=self._confirm_delete,
-            ).pack(fill="x", padx=4, pady=3)
+        self._render_notes(details.get("notes", []))
+
+    # --- notes ------------------------------------------------------------------
+
+    def _render_notes(self, notes) -> None:
+        for child in self.notes_frame.winfo_children():
+            child.destroy()
+
+        if not notes:
+            self.no_notes_label.pack(pady=(0, 4))
+            return
+        self.no_notes_label.pack_forget()
+
+        for note in notes:
+            row = ctk.CTkFrame(self.notes_frame, corner_radius=8)
+            row.pack(fill="x", padx=4, pady=3)
+
+            preview = note.body.strip().replace("\n", " ")
+            if len(preview) > 120:
+                preview = preview[:117] + "…"
+            text = note.display_title()
+            if preview:
+                text += f"\n{preview}"
+            ctk.CTkLabel(
+                row, text=text, font=ctk.CTkFont(size=12), anchor="w",
+                justify="left", wraplength=380,
+            ).pack(side="left", padx=(12, 6), pady=8, fill="x", expand=True)
+
+            button_row = ctk.CTkFrame(row, fg_color="transparent")
+            button_row.pack(side="right", padx=(6, 10))
+            ctk.CTkButton(
+                button_row, text="View", width=60, height=24, fg_color="gray30",
+                hover_color="gray25",
+                command=lambda n=note: self._view_note(n),
+            ).pack(side="left", padx=(0, 4))
+            ctk.CTkButton(
+                button_row, text="Delete", width=64, height=24,
+                fg_color="#8b3030", hover_color="#a33d3d",
+                command=lambda n=note: self._confirm_delete_note(n),
+            ).pack(side="left")
+
+    def _add_note(self) -> None:
+        NoteEditorDialog(self, self._state, note=None, default_day=self._day)
+
+    def _view_note(self, note) -> None:
+        NoteEditorDialog(self, self._state, note=note)
+
+    def _confirm_delete_note(self, note) -> None:
+        confirmed = ask_yes_no(
+            self,
+            "Delete note?",
+            f"Delete “{note.display_title()}” permanently?\n\n"
+            "This cannot be undone.",
+            confirm_text="Delete",
+            cancel_text="Keep it",
+        )
+        if not confirmed:
+            return
+        result = self._state.delete_note(note.id)
+        if not result.ok:
+            from app.gui.dialogs.message_dialog import show_error
+
+            show_error(self, result.message or "That note could not be found.")
+            return
+        self.refresh()
+
+    # --- sessions -----------------------------------------------------------------
 
     def _confirm_delete(self, session) -> None:
         confirmed = ask_yes_no(

@@ -3,6 +3,9 @@
 Month grid with medal indicators, prev/next/today navigation, and a modal
 day-details dialog on day click. Initial view is the current month; the last
 viewed month is preserved while the app runs.
+
+Days that have notes show a small note-count marker in the cell, and the
+notes themselves are listed inside the day-details dialog.
 """
 
 from __future__ import annotations
@@ -17,6 +20,8 @@ from app.gui.screens.base_screen import BaseScreen
 from app.utils.date_utils import add_months, format_minutes
 
 WEEKDAY_LABELS = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+
+NOTE_MARKER = "\U0001F4DD"  # memo emoji shown when a day has notes
 
 MEDAL_FG = {
     "bronze": "#8a5a33",
@@ -93,6 +98,7 @@ class CalendarScreen(BaseScreen):
         self.month_label.configure(text=f"{month_name} {self._year}")
 
         aggregates = self.state.get_month_view_data(self._year, self._month)
+        note_counts = self.state.get_note_counts_by_day()
         today = date.today()
 
         # Monday-first week layout (calendar.setfirstweekday safe locally).
@@ -111,6 +117,12 @@ class CalendarScreen(BaseScreen):
                     text += f"\n{format_minutes(aggregate.total_minutes)}"
                     if aggregate.medal:
                         text = f"{aggregate.medal[0].upper()} \u00b7 {text}"
+
+                notes_count = note_counts.get(day, 0)
+                if notes_count:
+                    marker = f"{NOTE_MARKER}{notes_count}" if notes_count > 1 \
+                        else NOTE_MARKER
+                    text += f"\n{marker}"
 
                 fg = MEDAL_FG.get(aggregate.medal) if aggregate else None
                 if fg is None and day == today:
