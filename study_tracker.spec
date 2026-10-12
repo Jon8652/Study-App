@@ -8,7 +8,29 @@
 # Build on Windows:  pyinstaller --noconfirm study_tracker.spec
 #              or:   .\run_build.ps1
 
+import os
+import tempfile
+
 block_cipher = None
+
+# The user's artwork is PNG (any size). Windows .exe icons must be .ico,
+# so derive one from assets/app_icon.png at build time via Pillow.
+_app_icon_png = os.path.join('assets', 'app_icon.png')
+_icon_path = None
+if os.path.isfile(_app_icon_png):
+    try:
+        from PIL import Image
+
+        _ico_tmp = os.path.join(tempfile.gettempdir(), 'studytracker_app.ico')
+        with Image.open(_app_icon_png) as _img:
+            _img.load()
+            if _img.mode != 'RGBA':
+                _img = _img.convert('RGBA')
+            _img.save(_ico_tmp, format='ICO',
+                      sizes=[(16, 16), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)])
+        _icon_path = _ico_tmp
+    except Exception:
+        _icon_path = None  # best-effort: build still succeeds without an exe icon
 
 a = Analysis(
     ['main.py'],
@@ -44,7 +66,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon='assets/app_icon.png',
+    icon=_icon_path,           # derived from user PNG artwork (None = default icon)
 )
 
 coll = COLLECT(
