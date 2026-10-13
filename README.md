@@ -17,7 +17,10 @@ executable with PyInstaller.
 - **Streaks** — qualifying day = ≥ 10 studied minutes; current & longest
   streaks shown on Stats (today doesn't break the streak until the day ends).
 - **Calendar** — Monday-first month grid, medal-colored day cells, click any
-  day to review/delete its sessions and see that day's notes.
+  day to review/delete its sessions and see that day's notes. Day tiles are
+  light grey in light mode (dark grey in dark mode), and today's tile uses
+  the same blue accent as the "Today" button in the top-right of the header
+  so the two always match.
 - **Notes** — a dedicated Notes screen for titled free-text notes: create,
   edit, search, and delete them via a list + detail-pane layout. Each note
   can optionally be attached to a calendar day (it then also appears on that
