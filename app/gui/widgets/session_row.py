@@ -10,13 +10,15 @@ from __future__ import annotations
 import customtkinter as ctk
 
 from app.core.models import Session
+from app.gui.theme import danger_button
 from app.utils.date_utils import format_minutes, format_time
 
 
 class SessionRow(ctk.CTkFrame):
     def __init__(self, master, session: Session, xp_rate: int,
                  on_delete=None, **kwargs):
-        super().__init__(master, corner_radius=8, **kwargs)
+        super().__init__(master, corner_radius=8, fg_color="#f4f7fb",
+                         border_width=1, border_color="#dde2e8", **kwargs)
 
         info = (
             f"{format_time(session.start_local)} \u2192 {format_time(session.end_local)}   "
@@ -29,12 +31,10 @@ class SessionRow(ctk.CTkFrame):
         ).pack(side="left", padx=(14, 6), pady=10)
 
         if on_delete is not None:
-            ctk.CTkButton(
+            danger_button(
                 self,
                 text="Delete",
                 width=76,
                 height=26,
-                fg_color="#8b3030",
-                hover_color="#a33d3d",
                 command=lambda: on_delete(session),
             ).pack(side="right", padx=(6, 12), pady=8)

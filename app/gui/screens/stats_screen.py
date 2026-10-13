@@ -3,6 +3,8 @@
 Sections: period totals (today/week/month/lifetime XP + time), streaks,
 medal counts, and general activity. All values come from the stats engine
 so they always match calendar/home derivations, and refresh on any change.
+Cards are colour-coded per metric family (time = blue, XP = gold, streaks
+= accent blue, medals = bronze/silver/gold) for quick visual scanning.
 """
 
 from __future__ import annotations
@@ -10,6 +12,7 @@ from __future__ import annotations
 import customtkinter as ctk
 
 from app.gui.screens.base_screen import BaseScreen
+from app.gui.theme import MUTED_TEXT
 from app.gui.widgets.summary_card import SummaryCard
 from app.utils.date_utils import format_minutes
 
@@ -24,51 +27,57 @@ class StatsScreen(BaseScreen):
         self._cards: dict[str, SummaryCard] = {}
 
         def section(title: str) -> ctk.CTkFrame:
+            header = ctk.CTkFrame(self.scroll, fg_color="transparent")
+            header.pack(fill="x", pady=(14, 6))
+            # Small accent tick before the section name for a designed look.
+            ctk.CTkFrame(header, width=4, height=16, corner_radius=2,
+                         fg_color="#2b6cb0").pack(side="left", padx=(0, 8))
             ctk.CTkLabel(
-                self.scroll, text=title,
+                header, text=title,
                 font=ctk.CTkFont(size=15, weight="bold"), anchor="w",
-            ).pack(fill="x", pady=(12, 4))
+            ).pack(side="left")
             row = ctk.CTkFrame(self.scroll, fg_color="transparent")
             row.pack(fill="x")
             return row
 
-        def add_card(row, key: str, caption: str, col_span: int = 1):
-            card = SummaryCard(row, caption)
+        def add_card(row, key: str, caption: str, col_span: int = 1,
+                     color: str | None = None):
+            card = SummaryCard(row, caption, color=color)
             card.grid(row=0, column=len(row.grid_slaves()), columnspan=col_span,
-                      padx=(0, 10), sticky="nsew")
+                      padx=(0, 10), pady=4, sticky="nsew")
             self._cards[key] = card
             return card
 
         # --- Period totals ----------------------------------------------------
         time_row = section("Study time")
         for key in ("today_time", "week_time", "month_time", "lifetime_time"):
-            add_card(time_row, key, "")
+            add_card(time_row, key, "", color="time")
         labels = ["Today", "This week", "This month", "Lifetime"]
         for i, label in enumerate(labels):
             self._cards[list(self._cards)[i]].set_value("\u2014", label)
 
         xp_row = section("XP earned")
         for key in ("today_xp", "week_xp", "month_xp", "lifetime_xp"):
-            add_card(xp_row, key, "")
+            add_card(xp_row, key, "", color="xp")
         for i, label in enumerate(labels):
             self._cards[list(self._cards)[4 + i]].set_value("\u2014", label)
 
         # --- Streaks ------------------------------------------------------------
         streak_row = section("Streaks")
-        add_card(streak_row, "current_streak", "Current streak")
-        add_card(streak_row, "longest_streak", "Longest streak")
+        add_card(streak_row, "current_streak", "Current streak", color="accent")
+        add_card(streak_row, "longest_streak", "Longest streak", color="accent")
 
         # --- Medals ---------------------------------------------------------------
         medal_row = section("Medal days (highest per day)")
-        add_card(medal_row, "bronze", "Bronze")
-        add_card(medal_row, "silver", "Silver")
-        add_card(medal_row, "gold", "Gold")
+        add_card(medal_row, "bronze", "Bronze", color="bronze")
+        add_card(medal_row, "silver", "Silver", color="silver")
+        add_card(medal_row, "gold", "Gold", color="gold")
 
         # --- General activity --------------------------------------------------
         activity_row = section("Activity")
         add_card(activity_row, "sessions", "Total sessions")
         add_card(activity_row, "active_days", "Active days")
-        add_card(activity_row, "average", "Avg daily time")
+        add_card(activity_row, "average", "Avg daily time", color="time")
         add_card(activity_row, "notes", "Total notes")
 
         for row_frame in (time_row, xp_row, streak_row, medal_row, activity_row):
@@ -79,7 +88,7 @@ class StatsScreen(BaseScreen):
             self.scroll,
             text="No study data yet \u2014 log your first session on the Home "
                  "screen and stats will appear here.",
-            font=ctk.CTkFont(size=13), text_color=("gray40", "gray65"),
+            font=ctk.CTkFont(size=13), text_color=MUTED_TEXT,
             wraplength=520, justify="left",
         )
 

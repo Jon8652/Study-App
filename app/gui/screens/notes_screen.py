@@ -23,7 +23,22 @@ from app.gui.dialogs.confirm_dialog import ask_yes_no
 from app.gui.dialogs.message_dialog import show_error
 from app.gui.dialogs.note_editor_dialog import NoteEditorDialog
 from app.gui.screens.base_screen import BaseScreen
+from app.gui.theme import (
+    ACCENT,
+    BORDER,
+    CARD_FG,
+    MUTED_TEXT,
+    NEUTRAL,
+    NEUTRAL_TEXT,
+    danger_button,
+    neutral_button,
+)
 from app.utils.date_utils import format_date_long
+
+# Note-row fills: selected rows get a tinted accent background in dark mode
+# and a soft blue in light mode, so selection reads clearly in both themes.
+NOTE_ROW_SELECTED = ("#dbe7f5", "#2b3a52")
+NOTE_ROW_HOVER = ("#eef1f5", "#31313d")
 
 
 class NotesScreen(BaseScreen):
@@ -43,12 +58,13 @@ class NotesScreen(BaseScreen):
         toolbar.pack(fill="x", pady=(0, 8))
 
         ctk.CTkButton(
-            toolbar, text="+  New note", width=130,
-            command=self._new_note,
+            toolbar, text="+  New note", width=130, height=34,
+            corner_radius=8, command=self._new_note,
         ).pack(side="left")
 
         self.search_entry = ctk.CTkEntry(
-            toolbar, placeholder_text="Search notes…", width=240,
+            toolbar, placeholder_text="\U0001F50D  Search notes…", width=240,
+            height=34, corner_radius=8,
         )
         self.search_entry.pack(side="right")
         self.search_entry.bind("<KeyRelease>", lambda _e: self.refresh())
@@ -62,10 +78,14 @@ class NotesScreen(BaseScreen):
 
         self.list_frame = ctk.CTkScrollableFrame(
             body, label_text="All notes", corner_radius=12,
+            fg_color=CARD_FG, border_width=1, border_color=BORDER,
+            label_font=ctk.CTkFont(size=13, weight="bold"),
         )
         self.list_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 8))
 
-        self.detail_frame = ctk.CTkFrame(body, corner_radius=12)
+        self.detail_frame = ctk.CTkFrame(
+            body, corner_radius=12, fg_color=CARD_FG,
+            border_width=1, border_color=BORDER)
         self.detail_frame.grid(row=0, column=1, sticky="nsew")
         self.detail_frame.grid_columnconfigure(0, weight=1)
         self.detail_frame.grid_rowconfigure(1, weight=1)
@@ -82,7 +102,8 @@ class NotesScreen(BaseScreen):
 
         self.detail_body = ctk.CTkTextbox(
             self.detail_frame, font=ctk.CTkFont(size=13), wrap="word",
-            activate_scrollbars=True,
+            activate_scrollbars=True, corner_radius=8,
+            border_width=1, border_color=BORDER,
         )
         self.detail_body.grid(row=1, column=0, sticky="nsew", padx=16)
         self.detail_body.configure(state="disabled")
@@ -90,22 +111,23 @@ class NotesScreen(BaseScreen):
         actions = ctk.CTkFrame(self.detail_frame, fg_color="transparent")
         actions.grid(row=2, column=0, sticky="ew", padx=16, pady=(10, 14))
         self.edit_button = ctk.CTkButton(actions, text="Edit note", width=110,
+                                         height=32, corner_radius=8,
                                          command=self._edit_selected)
         self.edit_button.pack(side="left", padx=(0, 8))
-        self.delete_button = ctk.CTkButton(
-            actions, text="Delete", width=90, fg_color="#8b3030",
-            hover_color="#a33d3d", command=self._delete_selected)
+        self.delete_button = danger_button(
+            actions, text="Delete", width=90, height=32,
+            command=self._delete_selected)
         self.delete_button.pack(side="left")
-        self.open_day_button = ctk.CTkButton(
-            actions, text="Open day", width=100, fg_color="gray30",
-            hover_color="gray25", command=self._open_day_of_selected)
+        self.open_day_button = neutral_button(
+            actions, text="Open day", width=100, height=32,
+            command=self._open_day_of_selected)
         # Date / "Updated …" info sits at the bottom-right of the action
         # row (next to Delete) instead of under the title, where it used to
         # collide with long wrapped titles.
         self.detail_meta = ctk.CTkLabel(
             actions, text="",
             font=ctk.CTkFont(size=12), anchor="e", justify="right",
-            text_color=("gray40", "gray65"),
+            text_color=MUTED_TEXT,
         )
         self.detail_meta.pack(side="right")
 
@@ -222,7 +244,7 @@ class NotesScreen(BaseScreen):
                 text="No notes yet." if not self.state.dataset.notes
                      else "No notes match your search.",
                 font=ctk.CTkFont(size=13),
-                text_color=("gray40", "gray65"),
+                text_color=MUTED_TEXT,
             ).pack(pady=18, padx=12)
             return
 
@@ -244,8 +266,11 @@ class NotesScreen(BaseScreen):
             row = ctk.CTkButton(
                 self.list_frame, text=text, anchor="w",
                 height=54, corner_radius=8,
-                fg_color="gray25" if selected else "gray18",
-                hover_color="gray25",
+                fg_color=NOTE_ROW_SELECTED if selected else CARD_FG,
+                hover_color=NOTE_ROW_HOVER,
+                text_color=(ACCENT if selected else None),
+                border_width=1,
+                border_color=ACCENT if selected else BORDER,
                 font=ctk.CTkFont(size=13),
                 command=lambda nid=note.id: self._select(nid),
             )

@@ -10,9 +10,11 @@ notes themselves are listed inside the day-details dialog.
 Colour scheme: plain day tiles are light grey in light mode (dark grey in
 dark mode); today's tile uses the same blue accent as the "Today" button in
 the header so the two match; medal days use bronze/silver/gold accents.
-Date-number colours follow light/dark mode switches automatically (an
-appearance-mode watcher recolours the rendered cells immediately, so no
-month navigation is needed after toggling the theme).
+The selected day gets an accent-blue outline ring so it stays visible even
+when its fill colour is neutral.  Date-number colours follow light/dark
+mode switches automatically (an appearance-mode watcher recolours the
+rendered cells immediately, so no month navigation is needed after
+toggling the theme).
 """
 
 from __future__ import annotations
@@ -24,6 +26,7 @@ import customtkinter as ctk
 
 from app.gui.dialogs.day_details_dialog import DayDetailsDialog
 from app.gui.screens.base_screen import BaseScreen
+from app.gui.theme import ACCENT, BORDER, CARD_FG, MUTED_TEXT
 from app.utils.date_utils import add_months, format_minutes
 
 WEEKDAY_LABELS = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
@@ -43,8 +46,12 @@ MEDAL_HOVER = {
 }
 
 # Shared accent for the Today tile and the Today button (both blue).
-TODAY_BLUE = "#2b6cb0"
+TODAY_BLUE = ACCENT
 TODAY_BLUE_HOVER = "#255a94"
+
+# Plain-tile fills: light grey in light mode, dark grey in dark mode.
+PLAIN_FG = ("gray80", "gray18")
+PLAIN_HOVER = ("gray72", "gray25")
 
 
 class CalendarScreen(BaseScreen):
@@ -59,30 +66,35 @@ class CalendarScreen(BaseScreen):
         header = ctk.CTkFrame(self.content, fg_color="transparent")
         header.pack(fill="x", pady=(0, 8))
 
+        nav_font = ctk.CTkFont(size=15, weight="bold")
         ctk.CTkButton(header, text="\u2039", width=40, height=32,
+                      corner_radius=8, font=nav_font,
                       command=self._prev_month).pack(side="left")
         self.month_label = ctk.CTkLabel(
             header, text="", font=ctk.CTkFont(size=17, weight="bold"), width=190
         )
         self.month_label.pack(side="left", padx=8)
         ctk.CTkButton(header, text="\u203a", width=40, height=32,
+                      corner_radius=8, font=nav_font,
                       command=self._next_month).pack(side="left")
         # Same blue accent as today's tile so the two visually match.
         self.today_button = ctk.CTkButton(
-            header, text="Today", width=80, height=32,
+            header, text="Today", width=80, height=32, corner_radius=8,
             fg_color=TODAY_BLUE, hover_color=TODAY_BLUE_HOVER,
             text_color="white", command=self._go_today,
         )
         self.today_button.pack(side="right")
 
         # --- grid ------------------------------------------------------------
-        self.grid_frame = ctk.CTkFrame(self.content, corner_radius=12)
+        self.grid_frame = ctk.CTkFrame(
+            self.content, corner_radius=14,
+            fg_color=CARD_FG, border_width=1, border_color=BORDER)
         self.grid_frame.pack(fill="both", expand=True)
 
         for col, label in enumerate(WEEKDAY_LABELS):
             ctk.CTkLabel(
                 self.grid_frame, text=label, font=ctk.CTkFont(size=12, weight="bold"),
-                text_color=("gray35", "gray70"),
+                text_color=MUTED_TEXT,
             ).grid(row=0, column=col, sticky="nsew", padx=2, pady=(10, 4))
 
         self._cells: dict[date, ctk.CTkButton] = {}
@@ -256,8 +268,9 @@ class CalendarScreen(BaseScreen):
                 is_plain = fg is None
                 if is_plain:
                     # Light grey tiles in light mode, dark grey in dark mode.
-                    fg, hover = ("gray80", "gray18"), ("gray72", "gray25")
+                    fg, hover = PLAIN_FG, PLAIN_HOVER
 
+                selected = day == self._selected
                 cell = ctk.CTkButton(
                     self.grid_frame,
                     text=text,
@@ -267,6 +280,8 @@ class CalendarScreen(BaseScreen):
                     fg_color=fg,
                     hover_color=hover,
                     text_color=self._cell_text_color(is_plain),
+                    border_width=2 if selected else 0,
+                    border_color=ACCENT if selected else "transparent",
                     command=lambda d=day: self._open_day(d),
                 )
                 cell._is_day_cell = True

@@ -12,6 +12,7 @@ import customtkinter as ctk
 
 from app.constants import (
     APP_NAME,
+    APP_VERSION,
     WINDOW_HEIGHT,
     WINDOW_MIN_HEIGHT,
     WINDOW_MIN_WIDTH,
@@ -24,6 +25,12 @@ from app.gui.screens.home_screen import HomeScreen
 from app.gui.screens.notes_screen import NotesScreen
 from app.gui.screens.settings_screen import SettingsScreen
 from app.gui.screens.stats_screen import StatsScreen
+from app.gui.theme import (
+    ACCENT_TEXT,
+    NAV_ACTIVE_BG,
+    NAV_HOVER,
+    SIDEBAR_FG,
+)
 from app.persistence.schema import FRIENDLY_MESSAGES, FutureSchemaError
 from app.state.app_state import AppState
 from app.utils.paths import get_default_save_path
@@ -37,7 +44,8 @@ NAV_ITEMS = (
     ("settings", "Settings", "settings_icon"),
 )
 
-NAV_ICONS_LIGHT = ("gray20", "gray85")  # text color tuple for inactive buttons
+# Text colour of inactive nav buttons (light mode / dark mode).
+NAV_TEXT_INACTIVE = ("gray25", "gray75")
 
 
 class MainWindow(ctk.CTk):
@@ -81,21 +89,41 @@ class MainWindow(ctk.CTk):
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(0, weight=1)
 
-        self.sidebar = ctk.CTkFrame(self, corner_radius=0, width=180)
+        self.sidebar = ctk.CTkFrame(
+            self, corner_radius=0, width=210, fg_color=SIDEBAR_FG)
         self.sidebar.grid(row=0, column=0, sticky="nsew")
+        self.sidebar.grid_propagate(False)
 
-        brand = ctk.CTkLabel(
-            self.sidebar, text=APP_NAME,
-            font=ctk.CTkFont(size=15, weight="bold"), wraplength=160,
-        )
-        brand.pack(pady=(20, 18), padx=10)
+        # --- brand block: app icon + name + tagline ---------------------------
+        brand_row = ctk.CTkFrame(self.sidebar, fg_color="transparent")
+        brand_row.pack(pady=(26, 4), padx=14, fill="x")
+
+        app_icon = load_photo("app_icon", size=34)
+        if app_icon is not None:
+            self._brand_icon_ref = app_icon
+            ctk.CTkLabel(brand_row, image=app_icon, text="").pack(side="left")
+        ctk.CTkLabel(
+            brand_row, text=APP_NAME,
+            font=ctk.CTkFont(size=16, weight="bold"), wraplength=130, anchor="w",
+        ).pack(side="left", padx=(8, 0))
+
+        ctk.CTkLabel(
+            self.sidebar, text="Track · Earn XP · Stay consistent",
+            font=ctk.CTkFont(size=10), text_color=NAV_TEXT_INACTIVE,
+            wraplength=180,
+        ).pack(pady=(0, 14), padx=14)
+
+        ctk.CTkFrame(self.sidebar, height=1, corner_radius=0,
+                     fg_color=("gray75", "gray25")).pack(fill="x", padx=14,
+                                                          pady=(0, 12))
 
         self._nav_buttons: dict[str, ctk.CTkButton] = {}
         self._nav_icon_refs: dict[str, object] = {}
         for key, label, icon_key in NAV_ITEMS:
             button = ctk.CTkButton(
                 self.sidebar, text=f"  {label}", height=40, anchor="w",
-                fg_color="transparent", hover_color=("gray75", "gray25"),
+                corner_radius=10, fg_color="transparent",
+                hover_color=NAV_HOVER,
                 font=ctk.CTkFont(size=14),
                 command=lambda k=key: self.show_screen(k),
             )
@@ -105,8 +133,14 @@ class MainWindow(ctk.CTk):
             if icon is not None:
                 self._nav_icon_refs[key] = icon
                 button.configure(image=icon)
-            button.pack(fill="x", padx=10, pady=2)
+            button.pack(fill="x", padx=12, pady=3)
             self._nav_buttons[key] = button
+
+        # Sidebar footer with the app version — small visual anchor.
+        ctk.CTkLabel(
+            self.sidebar, text=f"v{APP_VERSION}",
+            font=ctk.CTkFont(size=10), text_color=("gray55", "gray45"),
+        ).pack(side="bottom", pady=(0, 12))
 
         self.content_area = ctk.CTkFrame(self, corner_radius=0, fg_color="transparent")
         self.content_area.grid(row=0, column=1, sticky="nsew", padx=(0, 8), pady=8)
@@ -140,9 +174,11 @@ class MainWindow(ctk.CTk):
         screen = self.screens[key]
         screen.tkraise()
         for other_key, button in self._nav_buttons.items():
+            active = other_key == key
             button.configure(
-                fg_color="gray25" if other_key == key else "transparent",
-                text_color="white" if other_key == key else ("gray20", "gray85"),
+                fg_color=NAV_ACTIVE_BG if active else "transparent",
+                text_color=(ACCENT_TEXT if active else NAV_TEXT_INACTIVE),
+                hover_color="transparent" if active else NAV_HOVER,
             )
 
     def refresh_all(self) -> None:
