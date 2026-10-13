@@ -266,45 +266,57 @@ class NotesScreen(BaseScreen):
             return
 
         for note in notes:
-            # Date tag as its own second line (not appended to the title):
-            # a CTkButton lays out multi-line text per `anchor`, so with
-            # anchor="w" both the title and the date stay left-aligned.
+            selected = note.id == self._selected_note_id
+
             day_tag = note.day.strftime("%b %d") if note.day else ""
             preview = note.body.strip().replace("\n", " ")
             if len(preview) > 60:
                 preview = preview[:57] + "…"
-            lines = [note.display_title()]
-            if day_tag:
-                lines.append(day_tag)
-            if preview:
-                lines.append(preview)
-            text = "\n".join(lines)
-            selected = note.id == self._selected_note_id
-            # NOTE: CTkButton has no `justify` option — passing one raises
-            # ValueError in its __init__ *after* the widget is half-created,
-            # which used to abort _render_list() mid-way. That left a broken,
-            # empty notes list (new notes never appeared) AND caused the
-            # "'CTkButton' object has no attribute '_font'" AttributeError on
-            # the next refresh when those half-built buttons were destroyed.
-            row = ctk.CTkButton(
-                self.list_frame, text=text, anchor="w",
-                height=54, corner_radius=8,
+
+            row = ctk.CTkFrame(
+                self.list_frame, corner_radius=8,
                 fg_color=NOTE_ROW_SELECTED if selected else CARD_FG,
-                hover_color=NOTE_ROW_HOVER,
-                text_color=(ACCENT if selected else None),
                 border_width=1,
                 border_color=ACCENT if selected else BORDER,
-                font=ctk.CTkFont(size=13),
-                command=lambda nid=note.id: self._select(nid),
             )
-            # CTkButton reserves an internal left gutter of
-            # max(corner_radius, border_width + 1) = 8 px before its text.
-            # padx=11 keeps a small 3 px offset from the card's inner edge
-            # while cancelling most of that gutter, so the row *text* lands
-            # on the same x as the "All notes" header text (measured under
-            # Xvfb: both at canvas inset + 3). The row background still
-            # reads as a pill inset from the canvas edge.
-            row.pack(fill="x", padx=(11, 6), pady=3)
+            # Title / date / preview are each their own plain CTkLabel with
+            # anchor="w" and justify="left".  A single multi-line CTkButton
+            # (as used previously) cannot do per-line left justification:
+            # customtkinter never forwards `justify` to the button's inner
+            # tkinter label, so short lines such as calendar notes' date tag
+            # rendered centred inside the label's bounding box — and every
+            # calendar-attached note (title, date and content alike) looked
+            # centre-aligned compared to regular notes.
+            labels = [(note.display_title(),
+                       ctk.CTkFont(size=13, weight="bold"),
+                       ACCENT if selected else None)]
+            if day_tag:
+                labels.append((day_tag, ctk.CTkFont(size=12), MUTED_TEXT))
+            if preview:
+                labels.append((preview, ctk.CTkFont(size=12), MUTED_TEXT))
+            for i, (txt, fnt, color) in enumerate(labels):
+                # corner_radius=0 cancels CTkLabel's hidden internal text
+                # inset of min(corner_radius, height/2); the default theme
+                # gives labels corner_radius=6, which used to shift every
+                # line a few px right of where it was packed.
+                ctk.CTkLabel(
+                    row, text=txt, font=fnt, anchor="w", justify="left",
+                    corner_radius=0,
+                    text_color=color if color is not None else ("gray90", "gray10"),
+                ).pack(fill="x", padx=4,
+                       pady=((8, 2) if i == 0 else (0, 8) if i == len(labels) - 1 else 0))
+
+            # The old (correctly aligned) rows were CTkButtons whose text
+            # landed at canvas-inset + 15 (pack padx 6 + border 1 + the
+            # button's own max(corner_radius, border+1) = 8 px gutter).
+            # pack padx=(9, 6) + frame border 1 + label padx 4 reproduces
+            # that exact left edge for every line of every row.
+            row.pack(fill="x", padx=(9, 6), pady=3)
+            # Make the whole card clickable like the old button rows.
+            row.bind("<Button-1>", lambda _e, nid=note.id: self._select(nid))
+            for child in row.winfo_children():
+                child.bind("<Button-1>",
+                           lambda _e, nid=note.id: self._select(nid))
 
     def _render_detail(self) -> None:
         note = self._selected_note()
