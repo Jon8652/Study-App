@@ -59,12 +59,10 @@ PRIMARY_TEXT = ("gray10", "white")
 
 # --- Screen spacing ------------------------------------------------------------
 # Uniform inset between the window/screen edge and everything on a screen
-# (titles, cards, buttons, text).  The Statistics screen already rendered
-# its content flush at the container edge, so its screens are given a zero
-# inset; every other screen uses SCREEN_PAD_X so the left gap is identical
-# for all boxes, buttons and labels.
+# (titles, cards, buttons, text).  Every screen — Statistics included —
+# uses SCREEN_PAD_X so the left gap is identical for all boxes, buttons
+# and labels.
 SCREEN_PAD_X = 24
-STATS_PAD_X = 0
 
 # --- Notes screen surfaces -----------------------------------------------------
 # The right-hand detail card sits on a soft blue (a slightly deeper tint of the

@@ -1,14 +1,8 @@
-== NOTES ==
-HEADER: x=25.0 'All notes'
-LISTROW: x=27.0 'First note|Oct 13|Body of first no'
-LISTROW: x=27.0 'Second|Another body'
-DETAIL: x=478.0 'Second'
-DETAIL: x=479.0 '<TEXT>'
-DETAIL: x=499.0 'Edit note'
-DETAIL: x=613.0 'Delete'
-DETAIL: x=1125.0 'Updated 2026-10-13 11:15'
-DETAIL2: x=478.0 'Second'
-DETAIL2: x=479.0 '<TEXT>'
-DETAIL2: x=499.0 'Edit note'
-DETAIL2: x=613.0 'Delete'
-DETAIL2: x=1125.0 'Updated 2026-10-13 11:15'
+size 1280x800: widths=[326, 322, 327] eq=False p3right=1247 customright=1248 aligned=True
+Traceback (most recent call last):
+  File "/workspace/_tmp/verify3.py", line 37, in <module>
+    check(1280, 800)
+  File "/workspace/_tmp/verify3.py", line 35, in check
+    assert ok_eq and ok_right
+           ^^^^^^^^^^^^^^^^^^
+AssertionError

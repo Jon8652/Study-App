@@ -1,49 +1,66 @@
-import sys, tempfile
-from pathlib import Path
-sys.path.insert(0, "/workspace")
-from app.utils import paths
-paths.set_override_data_dir(Path(tempfile.mkdtemp()))
-import customtkinter as ctk, tkinter
-from datetime import date
+import customtkinter as ctk
+from app.gui.main_window import MainWindow
 from app.state.app_state import AppState
 
-root = ctk.CTk()
-root.geometry("1280x860+0+0")
-state = AppState()
-state.create_note("First note", "Body of first note", day=date.today())
-state.create_note("Second", "Another body")
+ctk.set_appearance_mode("dark")
+app = MainWindow(app_state=AppState())
+app.run_startup_load()
 
-def dump(widget, tag):
-    out = []
-    def walk(w):
-        if isinstance(w, (tkinter.Label, tkinter.Text)) and w.winfo_ismapped():
-            pad = int(str(w.cget("padx")) or 0)
-            txt = w.cget("text") if isinstance(w, tkinter.Label) else "<TEXT>"
-            out.append((w.winfo_rootx() + pad, txt[:34].replace("\n", "|")))
-        for c in w.winfo_children():
-            walk(c)
-    walk(widget)
-    for x, t in sorted(out):
-        print(tag, "x=%.1f" % x, repr(t))
-    return out
+def pump(n=10):
+    for _ in range(n):
+        app.update_idletasks(); app.update()
 
-from app.gui.screens.notes_screen import NotesScreen
-ns = NotesScreen(root, state)
-ns.grid(row=0, column=0, sticky="nsew")
-root.grid_rowconfigure(0, weight=1)
-root.grid_columnconfigure(0, weight=1)
-for _ in range(5):
-    root.update(); root.update_idletasks()
-print("== NOTES ==")
-dump(ns.list_frame._label, "HEADER:")
-dump(ns.list_frame, "LISTROW:")
-dump(ns.detail_frame, "DETAIL:")
+def walk(w, out):
+    for c in w.winfo_children():
+        out.append(c); walk(c, out)
 
-from app.gui.screens.settings_screen import SettingsScreen
-ss = SettingsScreen(root, state)
-ss.grid(row=0, column=0, sticky="nsew")
-for _ in range(5):
-    root.update(); root.update_idletasks()
-print("== SETTINGS ==")
-dump(ss, "SETTING:")
-root.destroy()
+# preload all screens then resize to settle grid geometry
+for k in ("home","calendar","notes","stats","settings"):
+    app.show_screen(k); pump(3)
+app.geometry("1280x800")
+pump(15)
+app.show_screen("home"); pump(6)
+
+home = app.screens["home"]
+ws=[]; walk(home.content, ws)
+btns=[w for w in ws if isinstance(w, ctk.CTkButton)]
+presets=[b for b in btns if b.cget("text") in ("30 minutes","1 hour","2 hours")]
+cst=[b for b in btns if "custom" in b.cget("text").lower()][0]
+widths=[b.winfo_width() for b in presets]
+edges=[(b.winfo_rootx(), b.winfo_rootx()+b.winfo_width()) for b in presets]
+print("preset widths:", widths)
+print("preset edges:", edges)
+print("custom edge:", cst.winfo_rootx(), cst.winfo_rootx()+cst.winfo_width())
+assert len(set(widths))==1, "presets unequal"
+assert abs(edges[-1][1]-(cst.winfo_rootx()+cst.winfo_width()))<=1, "right misaligned"
+gaps=[edges[1][0]-edges[0][1], edges[2][0]-edges[1][1]]
+print("gaps:", gaps)
+
+labels=[w for w in ws if isinstance(w, ctk.CTkLabel) and w.cget("text")=="Quick log"]
+today_card=[w for w in ws if type(w).__name__=="CTkFrame" and w.winfo_parent()==home.content._canvas._parent_frame.__class__.__name__ ]
+print("Quick log x:", labels[0].winfo_rootx(), "preset1 x:", presets[0].winfo_rootx())
+
+# notes panes
+app.show_screen("notes"); pump(8)
+n=app.screens["notes"]
+lw=n.list_frame.winfo_width(); dw=n.detail_frame.winfo_width()
+print("notes list/detail:", lw, dw, round(lw/dw,3))
+assert lw<dw and lw>0.45*dw
+
+# stats alignment vs home
+app.show_screen("stats"); pump(8)
+s=app.screens["stats"]
+ws2=[]; walk(s, ws2)
+stitle=[w for w in ws2 if isinstance(w, ctk.CTkLabel) and w.cget("text")=="Statistics"][0]
+htitle=[w for w in walk(home,[]) or [] if False]
+hw=[]; walk(home,hw)
+h_title=[w for w in hw if isinstance(w, ctk.CTkLabel) and w.cget("text")=="Log Study"][0]
+print("Stats title x:", stitle.winfo_rootx(), "Home title x:", h_title.winfo_rootx())
+cards=[w for w in ws2 if type(w).__name__=="SummaryCard"]
+print("first stat card x:", cards[0].winfo_rootx())
+lastcard=cards[-1]
+print("scroll right:", )
+sf=[w for w in ws2 if type(w).__name__=="CTkScrollableFrame"][0]
+print("stat row right edge (card4):", cards[3].winfo_rootx()+cards[3].winfo_width())
+assert stitle.winfo_rootx()==h_title.winfo_rootx(), "title x mismatch"
+print("ALL OK")

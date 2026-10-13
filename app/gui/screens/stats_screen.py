@@ -12,16 +12,12 @@ from __future__ import annotations
 import customtkinter as ctk
 
 from app.gui.screens.base_screen import BaseScreen
-from app.gui.theme import MUTED_TEXT, STATS_PAD_X
+from app.gui.theme import MUTED_TEXT
 from app.gui.widgets.summary_card import SummaryCard
 from app.utils.date_utils import format_minutes
 
 
 class StatsScreen(BaseScreen):
-    # Statistics already had its content flush with the screen edge — keep
-    # the exact same spacing as before (no extra inset on this screen).
-    PAD_X = STATS_PAD_X
-
     def __init__(self, master, state):
         super().__init__(master, state, title="Statistics")
 

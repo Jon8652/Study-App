@@ -1,25 +1,6 @@
-== NOTES ==
-HEADER: x=25.0 'All notes'
-LISTROW: x=27.0 'First note|Oct 13|Body of first no'
-LISTROW: x=27.0 'Second|Another body'
-DETAIL: x=475.0 'Second'
-DETAIL: x=476.0 '<TEXT>'
-DETAIL: x=504.0 'Edit note'
-DETAIL: x=618.0 'Delete'
-DETAIL: x=1125.0 'Updated 2026-10-13 11:15'
-== SETTINGS ==
-SETTING: x=4.0 'Settings'
-SETTING: x=16.0 'Choose how the app looks. Your cho'
-SETTING: x=16.0 'Save file location:  /tmp/tmptm0cm'
-SETTING: x=16.0 'Where your data lives and when it '
-SETTING: x=16.0 'Your data autosaves after every ch'
-SETTING: x=16.0 'ℹ️'
-SETTING: x=16.0 '☾'
-SETTING: x=16.0 '💾'
-SETTING: x=30.0 'Data status'
-SETTING: x=38.0 'Appearance'
-SETTING: x=40.0 'Data management'
-SETTING: x=47.0 'Save now'
-SETTING: x=49.0 'Dark ✓'
-SETTING: x=173.0 'Load from file'
-SETTING: x=174.0 'Light'
+frame class: CTkFrame width: 996 x: 252 reqwidth: 200
+children of content: [('CTkFrame', ('#f6f9fd', '#242430')), ('CTkLabel', 'transparent'), ('CTkFrame', 'transparent'), ('CTkButton', ('#dfe4ea', 'gray28')), ('CTkLabel', 'transparent')]
+30 minutes geom x/abs: 0 252 w: 327 reqw: 140 grid info: {'in': <customtkinter.windows.widgets.ctk_frame.CTkFrame object .!ctkframe2.!homescreen.!ctkframe.!ctkframe2>, 'column': 0, 'row': 0, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': (0, 5), 'pady': 0, 'sticky': 'ew'}
+1 hour geom x/abs: 337 589 w: 322 reqw: 140 grid info: {'in': <customtkinter.windows.widgets.ctk_frame.CTkFrame object .!ctkframe2.!homescreen.!ctkframe.!ctkframe2>, 'column': 1, 'row': 0, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 5, 'pady': 0, 'sticky': 'ew'}
+2 hours geom x/abs: 669 921 w: 327 reqw: 140 grid info: {'in': <customtkinter.windows.widgets.ctk_frame.CTkFrame object .!ctkframe2.!homescreen.!ctkframe.!ctkframe2>, 'column': 2, 'row': 0, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': (5, 0), 'pady': 0, 'sticky': 'ew'}
+colconf: {'minsize': 0, 'pad': 0, 'uniform': 'presets', 'weight': 1}

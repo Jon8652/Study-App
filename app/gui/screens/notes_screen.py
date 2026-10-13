@@ -81,8 +81,8 @@ class NotesScreen(BaseScreen):
         # --- body: list + detail pane ---------------------------------------
         body = ctk.CTkFrame(self.content, fg_color="transparent")
         body.pack(fill="both", expand=True)
-        body.grid_columnconfigure(0, weight=1)
-        body.grid_columnconfigure(1, weight=2)
+        body.grid_columnconfigure(0, weight=5)
+        body.grid_columnconfigure(1, weight=6)
         body.grid_rowconfigure(0, weight=1)
 
         self.list_frame = ctk.CTkScrollableFrame(
