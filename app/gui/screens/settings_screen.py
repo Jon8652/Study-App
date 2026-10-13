@@ -92,6 +92,11 @@ class SettingsScreen(BaseScreen):
         self.status_label = ctk.CTkLabel(
             status, text="", font=ctk.CTkFont(size=12),
             text_color=MUTED_TEXT, justify="left", anchor="w", wraplength=560,
+            # CTkLabel indents its inner text by min(corner_radius, height/2)
+            # (default corner radius 6 here).  Zero it so the status text
+            # starts at exactly the same left edge (card padx=16) as the
+            # Appearance and Data management sections below/above it.
+            corner_radius=0,
         )
         self.status_label.pack(anchor="w", padx=16, pady=(6, 14))
 
