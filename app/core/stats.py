@@ -17,8 +17,8 @@ from datetime import date
 from typing import Iterable
 
 from app.constants import STREAK_QUALIFYING_MIN_MINUTES
-from app.core.date_rules import session_day
-from app.core.medals import BRONZE, GOLD, SILVER, build_day_aggregates
+from app.core.medals import BRONZE, DayAggregate, GOLD, SILVER, \
+    build_day_aggregates
 from app.core.models import Note, Session, Settings
 from app.core.streaks import current_streak, longest_streak
 from app.utils.date_utils import month_bounds, week_bounds
@@ -59,6 +59,19 @@ def _sum_period(day_map: dict[date, tuple[int, int]],
             minutes += m
             xp += x
     return PeriodTotals(minutes=minutes, xp=xp)
+
+
+def _count_medals(aggregates: Iterable[DayAggregate]) -> tuple[int, int, int]:
+    """Return (bronze, silver, gold) day counts — highest medal per day only."""
+    bronze = silver = gold = 0
+    for agg in aggregates:
+        if agg.medal == GOLD:
+            gold += 1
+        elif agg.medal == SILVER:
+            silver += 1
+        elif agg.medal == BRONZE:
+            bronze += 1
+    return bronze, silver, gold
 
 
 def compute_stats(

@@ -11,13 +11,17 @@ sessions.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, datetime
 from pathlib import Path
 from typing import Callable
 
 from app.core.date_rules import sessions_for_day
-from app.core.medals import DayAggregate, build_day_aggregates
+from app.core.medals import (
+    DayAggregate,
+    build_day_aggregates,
+    medal_for_minutes,
+)
 from app.core.models import (
     Dataset,
     MAX_NOTE_BODY_LENGTH,
@@ -27,6 +31,7 @@ from app.core.models import (
     Settings,
 )
 from app.core.stats import StatsResult, compute_stats
+from app.core.streaks import current_streak, longest_streak
 from app.persistence import repository
 from app.persistence.schema import SaveError
 
@@ -41,7 +46,14 @@ class ActionResult:
 
 
 class AppState:
-    """Central mutable application state with derived caches."""
+    """Central mutable application state with derived caches.
+
+    Derived indexes maintained incrementally (Part L):
+    - ``_day_index``: day -> DayAggregate totals/medal for that day
+    - ``_sessions_by_day``: day -> sessions attributed to that day
+    - ``_session_by_id`` / ``_note_by_id``: id -> object O(1) lookups
+    - ``_note_counts_by_day``: day -> number of attached notes
+    """
 
     def __init__(self, dataset: Dataset | None = None):
         self.dataset: Dataset = dataset or Dataset.empty()
@@ -49,6 +61,9 @@ class AppState:
         # day -> list of sessions attributed to that day (Part L): keeps
         # add/delete index maintenance O(sessions-that-day), not O(history).
         self._sessions_by_day: dict[date, list[Session]] = {}
+        self._session_by_id: dict[str, Session] = {}
+        self._note_by_id: dict[str, Note] = {}
+        self._note_counts_by_day: dict[date, int] = {}
         self._listeners: list[Callable[[], None]] = []
         self.dirty: bool = False
         self.rebuild_index()
@@ -157,7 +172,8 @@ class AppState:
 
     def delete_session(self, session_id: str) -> ActionResult:
         """Delete a session and update every derived view (FR-13..FR-15)."""
-        session = self.dataset.session_by_id(session_id)
+        session = self._session_by_id.get(session_id) \
+            or self.dataset.session_by_id(session_id)
         if session is None:
             return ActionResult(ok=False,
                                 message="That session could not be found.")
@@ -185,6 +201,7 @@ class AppState:
                                         "before saving.")
         note = Note.create(title=title, body=body, day=day)
         self.dataset.notes.append(note)
+        self._index_note_added(note)
         self._mark_dirty_and_save()
         self._notify()
         return ActionResult(ok=True, value=note)
@@ -192,7 +209,7 @@ class AppState:
     def update_note(self, note_id: str, title: str, body: str,
                     day: date | None = None) -> ActionResult:
         """Edit an existing note's title/body/day and autosave."""
-        note = self.dataset.note_by_id(note_id)
+        note = self._note_by_id.get(note_id) or self.dataset.note_by_id(note_id)
         if note is None:
             return ActionResult(ok=False,
                                 message="That note could not be found.")
@@ -202,21 +219,24 @@ class AppState:
             return ActionResult(ok=False,
                                 message="Give your note a title or some text "
                                         "before saving.")
+        old_day = note.day
         note.title = title
         note.body = body
         note.day = day
         note.updated_at_local = datetime.now()
+        self._index_note_moved(old_day, day)
         self._mark_dirty_and_save()
         self._notify()
         return ActionResult(ok=True, value=note)
 
     def delete_note(self, note_id: str) -> ActionResult:
         """Delete a note permanently and autosave."""
-        note = self.dataset.note_by_id(note_id)
+        note = self._note_by_id.get(note_id) or self.dataset.note_by_id(note_id)
         if note is None:
             return ActionResult(ok=False,
                                 message="That note could not be found.")
         self.dataset.notes.remove(note)
+        self._index_note_removed(note)
         self._mark_dirty_and_save()
         self._notify()
         return ActionResult(ok=True)
@@ -224,24 +244,35 @@ class AppState:
     # -- derived views --------------------------------------------------------------
 
     def rebuild_index(self) -> None:
-        """Rebuild the day-aggregate index from all sessions."""
+        """Rebuild every derived index from the dataset (load/manual-load)."""
         self._day_index = build_day_aggregates(
             self.dataset.sessions, self.dataset.settings.xp_per_10_minutes
         )
         by_day: dict[date, list[Session]] = {}
+        by_id: dict[str, Session] = {}
         for session in self.dataset.sessions:
             by_day.setdefault(session.day, []).append(session)
+            by_id[session.id] = session
         self._sessions_by_day = by_day
+        self._session_by_id = by_id
+
+        notes_by_id: dict[str, Note] = {}
+        note_counts: dict[date, int] = {}
+        for note in self.dataset.notes:
+            notes_by_id[note.id] = note
+            if note.day is not None:
+                note_counts[note.day] = note_counts.get(note.day, 0) + 1
+        self._note_by_id = notes_by_id
+        self._note_counts_by_day = note_counts
 
     def _index_add(self, session: Session) -> None:
         day = session.day
         rate = self.dataset.settings.xp_per_10_minutes
         xp = (session.duration_minutes // 10) * rate
         self._sessions_by_day.setdefault(day, []).append(session)
+        self._session_by_id[session.id] = session
         existing = self._day_index.get(day)
         if existing is None:
-            from app.core.medals import medal_for_minutes
-
             self._day_index[day] = DayAggregate(
                 day=day,
                 total_minutes=session.duration_minutes,
@@ -250,12 +281,8 @@ class AppState:
                 session_ids=(session.id,),
             )
         else:
-            from dataclasses import replace as dc_replace
-
-            from app.core.medals import medal_for_minutes
-
             total_minutes = existing.total_minutes + session.duration_minutes
-            self._day_index[day] = dc_replace(
+            self._day_index[day] = replace(
                 existing,
                 total_minutes=total_minutes,
                 total_xp=existing.total_xp + xp,
@@ -265,17 +292,15 @@ class AppState:
 
     def _index_remove(self, session: Session) -> None:
         day = session.day
+        self._session_by_id.pop(session.id, None)
         existing = self._day_index.get(day)
         if existing is None:
             return
-        from dataclasses import replace as dc_replace
-
-        from app.core.medals import medal_for_minutes
 
         remaining_ids = tuple(sid for sid in existing.session_ids
                               if sid != session.id)
-        day_sessions = self._sessions_by_day.get(day, [])
-        day_sessions = [s for s in day_sessions if s.id != session.id]
+        day_sessions = [s for s in self._sessions_by_day.get(day, [])
+                        if s.id != session.id]
         if day_sessions:
             self._sessions_by_day[day] = day_sessions
         else:
@@ -289,13 +314,43 @@ class AppState:
         # 10-minute blocks make XP non-additive, so simple subtraction of
         # the removed session's XP would be wrong (e.g. days of 10+10+5).
         total_xp = sum((s.duration_minutes // 10) * rate for s in day_sessions)
-        self._day_index[day] = dc_replace(
+        self._day_index[day] = replace(
             existing,
             total_minutes=total_minutes,
             total_xp=total_xp,
             medal=medal_for_minutes(total_minutes),
             session_ids=remaining_ids,
         )
+
+    # -- note index maintenance --------------------------------------------------
+
+    def _index_note_added(self, note: Note) -> None:
+        self._note_by_id[note.id] = note
+        if note.day is not None:
+            self._note_counts_by_day[note.day] = \
+                self._note_counts_by_day.get(note.day, 0) + 1
+
+    def _index_note_removed(self, note: Note) -> None:
+        self._note_by_id.pop(note.id, None)
+        if note.day is not None:
+            count = self._note_counts_by_day.get(note.day, 0) - 1
+            if count > 0:
+                self._note_counts_by_day[note.day] = count
+            else:
+                self._note_counts_by_day.pop(note.day, None)
+
+    def _index_note_moved(self, old_day: date | None, new_day: date | None) -> None:
+        if old_day == new_day:
+            return
+        if old_day is not None:
+            count = self._note_counts_by_day.get(old_day, 0) - 1
+            if count > 0:
+                self._note_counts_by_day[old_day] = count
+            else:
+                self._note_counts_by_day.pop(old_day, None)
+        if new_day is not None:
+            self._note_counts_by_day[new_day] = \
+                self._note_counts_by_day.get(new_day, 0) + 1
 
     # -- derived views --------------------------------------------------------------
 
