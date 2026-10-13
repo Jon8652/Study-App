@@ -17,15 +17,26 @@ executable with PyInstaller.
 - **Streaks** — qualifying day = ≥ 10 studied minutes; current & longest
   streaks shown on Stats (today doesn't break the streak until the day ends).
 - **Calendar** — Monday-first month grid, medal-colored day cells, click any
-  day to review/delete its sessions.
-- **Stats** — weekly / monthly / lifetime totals, active days, averages, and
-  medal counts.
+  day to review/delete its sessions and see that day's notes.
+- **Notes** — a dedicated Notes screen for titled free-text notes: create,
+  edit, search, and delete them via a list + detail-pane layout. Each note
+  can optionally be attached to a calendar day (it then also appears on that
+  day in the Calendar and in the day-details dialog); undated notes are
+  allowed too. The selected note's day and "Updated …" timestamp are shown
+  at the bottom-right of the detail pane, next to the Delete button, so they
+  never overlap long, wrapped titles. Limits: 120 characters per title,
+  100k per body; empty notes (no title *and* no text) are rejected with a
+  friendly message. Every create/edit/delete autosaves immediately.
+- **Stats** — weekly / monthly / lifetime totals, active days, averages,
+  medal counts, and a total-notes count.
 - **Settings** — dark/light theme (persisted), manual save, and a safe
   "Load from file" flow (validate → confirm → backup → replace).
 - **Resilient persistence** — atomic JSON writes, corrupt-file backup +
   quarantine recovery, schema-version protection, close-flush of unsaved
   changes. Data lives in the OS app-data folder (`%APPDATA%\StudyTracker`
-  on Windows).
+  on Windows). Notes are stored in a `notes` array inside `study_data.json`
+  alongside sessions; invalid note entries are skipped during validation so
+  a damaged record never blocks loading.
 
 ## Requirements
 
@@ -72,7 +83,7 @@ Assets resolve correctly both from source and in the frozen build via
 ## Tests & performance validation
 
 ```bash
-python -m pytest tests -q          # 51 unit tests (core engines + persistence)
+python -m pytest tests -q          # 57 unit tests (core engines + persistence)
 xvfb-run -a python tests/smoke_gui.py   # end-to-end GUI smoke test (Linux CI)
 python scripts/perf_check.py       # Part L budgets @ ~10k sessions
 ```
@@ -89,11 +100,14 @@ main.py                 entry point
 study_tracker.spec      PyInstaller build configuration (Part M)
 run_build.ps1           Windows release build script
 app/constants.py        gameplay rules (XP, medals, streaks, limits)
-app/core/               pure logic: models, xp, medals, streaks, stats, dates
+app/core/               pure logic: models (incl. Note), xp, medals, streaks,
+                        stats, dates
 app/persistence/        JSON repository, schema, atomic save, backup/recovery
 app/state/              AppState: single source of truth + incremental index
-app/gui/                MainWindow, screens (home/calendar/stats/settings),
-                        dialogs, widgets (medal badge, summary card)
+                        (session and note mutations/views, total-notes stat)
+app/gui/                MainWindow, screens (home/calendar/notes/stats/
+                        settings), dialogs (incl. note editor & day details),
+                        widgets (medal badge, summary card)
 app/utils/              paths (source vs frozen resources), asset loader
 assets/               PNG icons & medal images (user artwork, any size/mode)
 tests/                  unit tests + GUI smoke test
