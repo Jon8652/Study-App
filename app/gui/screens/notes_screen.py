@@ -78,6 +78,9 @@ class NotesScreen(BaseScreen):
             body, label_text="All notes", corner_radius=12,
             fg_color=CARD_FG, border_width=1, border_color=BORDER,
             label_font=ctk.CTkFont(size=13, weight="bold"),
+            # Left-align the "All notes" header so it lines up with the
+            # left-aligned note rows below it (the default is centered).
+            label_anchor="w",
         )
         self.list_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 8))
 
@@ -95,6 +98,10 @@ class NotesScreen(BaseScreen):
         self.detail_title = ctk.CTkLabel(
             self.detail_frame, text="",
             font=ctk.CTkFont(size=17, weight="bold"), anchor="w", wraplength=460,
+            # CTkLabel indents its inner text by min(corner_radius, height/2)
+            # (default corner radius 6 here); zero it so the title starts at
+            # exactly the grid padx edge and lines up with the body text.
+            corner_radius=0,
         )
         self.detail_title.grid(row=0, column=0, sticky="ew", padx=16, pady=(14, 6))
 
@@ -103,14 +110,21 @@ class NotesScreen(BaseScreen):
             activate_scrollbars=True, corner_radius=8,
             border_width=1, border_color=BORDER,
         )
-        self.detail_body.grid(row=1, column=0, sticky="nsew", padx=16)
+        # The textbox insets its text internally by max(corner_radius,
+        # border_width + 1) = 8 px, so use a smaller outer padx (16 - 8 = 8)
+        # to keep the body text on the same left edge as the title above.
+        self.detail_body.grid(row=1, column=0, sticky="nsew", padx=8)
         self.detail_body.configure(state="disabled")
 
         actions = ctk.CTkFrame(self.detail_frame, fg_color="transparent")
-        actions.grid(row=2, column=0, sticky="ew", padx=16, pady=(10, 14))
+        actions.grid(row=2, column=0, sticky="ew", padx=8, pady=(10, 14))
         self.edit_button = ctk.CTkButton(actions, text="Edit note", width=110,
                                          height=32, corner_radius=8,
                                          command=self._edit_selected)
+        # CTkButton reserves an internal left gutter of
+        # max(corner_radius, border_width + 1) = 8 px before its text when
+        # anchored west; with the frame's padx=8 this puts "Edit note" on
+        # the same left edge as the title / body text.
         self.edit_button.pack(side="left", padx=(0, 8))
         self.delete_button = danger_button(
             actions, text="Delete", width=90, height=32,
@@ -297,7 +311,9 @@ class NotesScreen(BaseScreen):
         self.detail_empty.grid_forget()
         self.detail_title.grid(row=0, column=0, sticky="ew",
                                padx=16, pady=(14, 6))
-        self.detail_body.grid(row=1, column=0, sticky="nsew", padx=16)
+        # padx=8 matches the textbox's internal 8 px text inset so the body
+        # text starts on the same left edge as the title (see __init__).
+        self.detail_body.grid(row=1, column=0, sticky="nsew", padx=8)
 
         meta_parts = []
         if note.day is not None:
@@ -321,7 +337,7 @@ class NotesScreen(BaseScreen):
             # to grid() raised TclError ("bad option -side") and broke note
             # selection. The button lives inside the packed `actions` frame,
             # so pack it like its siblings.
-            self.open_day_button.pack(side="left", padx=(16, 0))
+            self.open_day_button.pack(side="left")
             self.open_day_button.configure(state="normal")
         else:
             self.open_day_button.pack_forget()
