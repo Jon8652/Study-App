@@ -189,12 +189,14 @@ class Dataset:
                    updated_at=moment)
 
     def session_by_id(self, session_id: str) -> Session | None:
+        """Look up a session by id (O(n) scan; AppState keeps an id map)."""
         for session in self.sessions:
             if session.id == session_id:
                 return session
         return None
 
     def note_by_id(self, note_id: str) -> Note | None:
+        """Look up a note by id (O(n) scan; AppState keeps an id map)."""
         for note in self.notes:
             if note.id == note_id:
                 return note
