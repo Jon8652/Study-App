@@ -19,7 +19,7 @@ from typing import Iterable
 from app.constants import STREAK_QUALIFYING_MIN_MINUTES
 from app.core.date_rules import session_day
 from app.core.medals import BRONZE, GOLD, SILVER, build_day_aggregates
-from app.core.models import Session, Settings
+from app.core.models import Note, Session, Settings
 from app.core.streaks import current_streak, longest_streak
 from app.utils.date_utils import month_bounds, week_bounds
 
@@ -48,6 +48,8 @@ class StatsResult:
     silver_count: int = 0
     gold_count: int = 0
 
+    total_notes: int = 0
+
 
 def _sum_period(day_map: dict[date, tuple[int, int]],
                 start: date, end: date) -> PeriodTotals:
@@ -64,11 +66,14 @@ def compute_stats(
     settings: Settings | None = None,
     today: date | None = None,
     day_index: dict[date, DayAggregate] | None = None,
+    notes: Iterable[Note] | None = None,
 ) -> StatsResult:
     """Compute all statistics for the given sessions.
 
     ``day_index`` (Part L): an already-maintained daily aggregate index may
     be supplied to skip rebuilding aggregates from the full session list.
+    ``notes``: optional note collection; when provided, its size is
+    reported as the total-notes statistic.
     """
     sessions = list(sessions)
     xp_rate = settings.xp_per_10_minutes if settings else 10
@@ -119,5 +124,8 @@ def compute_stats(
             result.silver_count += 1
         elif agg.medal == BRONZE:
             result.bronze_count += 1
+
+    if notes is not None:
+        result.total_notes = len(list(notes))
 
     return result
