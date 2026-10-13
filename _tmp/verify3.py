@@ -1,46 +1,61 @@
-import sys, tempfile
-from pathlib import Path
-sys.path.insert(0, "/workspace")
-from app.utils import paths
-paths.set_override_data_dir(Path(tempfile.mkdtemp()))
-import customtkinter as ctk, tkinter
-from datetime import date
+import customtkinter as ctk
+from app.gui.main_window import MainWindow
 from app.state.app_state import AppState
 
-root = ctk.CTk()
-root.geometry("1280x860+0+0")
-state = AppState()
-state.create_note("First note", "Body of first note", day=date.today())
-state.create_note("Second", "Another body")
+ctk.set_appearance_mode("dark")
+app = MainWindow(app_state=AppState())
+app.run_startup_load()
 
-def dump(widget, tag):
-    out = []
-    def walk(w):
-        if isinstance(w, (tkinter.Label, tkinter.Text)) and w.winfo_ismapped():
-            pad = int(str(w.cget("padx")) or 0)
-            txt = w.cget("text") if isinstance(w, tkinter.Label) else "<TEXT>"
-            out.append((w.winfo_rootx() + pad, txt[:34].replace("\n", "|")))
-        for c in w.winfo_children():
-            walk(c)
-    walk(widget)
-    for x, t in sorted(out):
-        print(tag, "x=%.1f" % x, repr(t))
-    return out
+def pump(n=10):
+    for _ in range(n):
+        app.update_idletasks(); app.update()
 
-from app.gui.screens.notes_screen import NotesScreen
-ns = NotesScreen(root, state)
-ns.grid(row=0, column=0, sticky="nsew")
-root.grid_rowconfigure(0, weight=1)
-root.grid_columnconfigure(0, weight=1)
-for _ in range(5):
-    root.update(); root.update_idletasks()
-print("== NOTES ==")
-dump(ns.list_frame._label, "HEADER:")
-dump(ns.list_frame, "LISTROW:")
-dump(ns.detail_frame, "DETAIL:")
-# select the note with a day so Open day appears
-ns._select(state.get_all_notes()[0].id) if False else None
-for _ in range(3):
-    root.update(); root.update_idletasks()
-dump(ns.detail_frame, "DETAIL2:")
-root.destroy()
+def walk(w, out):
+    for c in w.winfo_children():
+        out.append(c); walk(c, out)
+
+for k in ("home","calendar","notes","stats","settings"):
+    app.show_screen(k); pump(3)
+
+def check(width, height):
+    app.geometry(f"{width}x{height}")
+    pump(25)
+    app.show_screen("home"); pump(6)
+    home = app.screens["home"]
+    ws=[]; walk(home.content, ws)
+    btns=[w for w in ws if isinstance(w, ctk.CTkButton)]
+    presets=[b for b in btns if b.cget("text") in ("30 minutes","1 hour","2 hours")]
+    cst=[b for b in btns if "custom" in b.cget("text").lower()][0]
+    widths=[b.winfo_width() for b in presets]
+    edges=[(b.winfo_rootx(), b.winfo_rootx()+b.winfo_width()) for b in presets]
+    ok_eq = len(set(widths))==1
+    ok_right = edges[-1][0] < cst.winfo_rootx() and 0 <= (cst.winfo_rootx()+cst.winfo_width())-edges[-1][1] <= 2
+    print(f"size {width}x{height}: widths={widths} eq={ok_eq} "
+          f"p3right={edges[-1][1]} customright={cst.winfo_rootx()+cst.winfo_width()} aligned={ok_right}")
+    assert ok_eq and ok_right
+
+check(1280, 800)
+check(1000, 700)
+check(1400, 900)
+
+# notes panes at final size
+app.show_screen("notes"); pump(8)
+n=app.screens["notes"]
+lw=n.list_frame.winfo_width(); dw=n.detail_frame.winfo_width()
+print("notes list/detail:", lw, dw, "ratio", round(lw/dw,3))
+assert lw < dw and lw > 0.45*dw
+
+# stats alignment
+app.show_screen("stats"); pump(8)
+s=app.screens["stats"]
+ws2=[]; walk(s, ws2)
+stitle=[w for w in ws2 if isinstance(w, ctk.CTkLabel) and w.cget("text")=="Statistics"][0]
+hw=[]; walk(app.screens["home"], hw)
+htitle=[w for w in hw if isinstance(w, ctk.CTkLabel) and w.cget("text")=="Log Study"][0]
+cards=[w for w in ws2 if type(w).__name__=="SummaryCard"]
+print("Stats title x:", stitle.winfo_rootx(), "== Home title x:", htitle.winfo_rootx(),
+      "| first card x:", cards[0].winfo_rootx())
+assert stitle.winfo_rootx()==htitle.winfo_rootx()
+cw=[w for w in hw if isinstance(w, ctk.CTkFrame)][0]
+print("Home card x:", cw.winfo_rootx())
+print("ALL OK")

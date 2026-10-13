@@ -102,18 +102,57 @@ class HomeScreen(BaseScreen):
             anchor="w",
         ).pack(fill="x", pady=(0, 6))
 
-        presets = ctk.CTkFrame(self.content, fg_color="transparent")
-        presets.pack(fill="x", pady=(0, 10))
+        n_presets = len(PRESET_DURATIONS_MINUTES)
+        GAP = 10            # space between neighbouring preset buttons
+        PRESET_H = 52       # same height as the buttons
+
+        # Equal-size preset buttons whose right edge lines up with the
+        # full-width custom button below.  A plain grid can't achieve this:
+        # CTkButton's internal grid sets a column minsize equal to its
+        # corner_radius (rounded-corner gutter) and tkinter splits odd pixel
+        # remainders unevenly between columns (measured 327/322/327 for an
+        # "equal" 3-column split).  Instead each button gets its own single-
+        # column grid row; the rows share one computed integer width via
+        # <Configure>, so all three are pixel-identical and end exactly at
+        # the custom button's right edge at any window size.
+        def _preset_row():
+            row = ctk.CTkFrame(self.content, fg_color="transparent")
+            row.pack(fill=None, pady=(0, 10), anchor="w")
+            row.grid_propagate(False)
+            row.grid_columnconfigure(0, weight=1, minsize=0)
+            row.grid_rowconfigure(0, minsize=PRESET_H)
+            return row
+
+        preset_rows = [_preset_row() for _ in range(n_presets)]
+        preset_buttons = []
         for i, minutes in enumerate(PRESET_DURATIONS_MINUTES):
-            ctk.CTkButton(
-                presets,
+            b = ctk.CTkButton(
+                preset_rows[i],
                 text=PRESET_LABELS.get(minutes, f"{minutes} minutes"),
-                height=52,
+                height=PRESET_H,
                 corner_radius=12,
                 font=ctk.CTkFont(size=15, weight="bold"),
                 command=lambda m=minutes: self._log_preset(m),
-            ).grid(row=0, column=i, padx=(0, 10), sticky="ew")
-            presets.grid_columnconfigure(i, weight=1)
+            )
+            b.grid(row=0, column=0, sticky="nsew")
+            preset_buttons.append(b)
+
+        def _relayout_presets(_event=None):
+            w = self.content.winfo_width()
+            if w <= 1:
+                return
+            bw = max(0, (w - GAP * (n_presets - 1)) // n_presets)
+            total = bw * n_presets + GAP * (n_presets - 1)
+            for row in preset_rows:
+                try:
+                    row.configure(width=total, height=PRESET_H)
+                except Exception:
+                    pass
+            # `total` is the largest evenly-divisible width that fits, so the
+            # last button ends flush (or ≤ 2 px short) of the custom button's
+            # right edge — visually aligned.
+
+        self.content.bind("<Configure>", _relayout_presets)
 
         ctk.CTkButton(
             self.content,
