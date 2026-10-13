@@ -8,11 +8,17 @@ from __future__ import annotations
 
 import customtkinter as ctk
 
+from app.gui.theme import SCREEN_PAD_X
 from app.state.app_state import AppState
 from app.utils.resources import load_photo
 
 
 class BaseScreen(ctk.CTkFrame):
+    # Uniform horizontal gap between the screen edge and *all* content
+    # (title, cards, buttons, text).  Screens opt out by overriding this
+    # with 0 (Statistics keeps its original flush layout).
+    PAD_X = SCREEN_PAD_X
+
     def __init__(self, master, state: AppState, title: str = ""):
         super().__init__(master, corner_radius=0, fg_color="transparent")
         self.state = state
@@ -22,10 +28,10 @@ class BaseScreen(ctk.CTkFrame):
             self, text=title, font=ctk.CTkFont(size=22, weight="bold"), anchor="w"
         )
         if title:
-            self.title_label.pack(fill="x", pady=(6, 10), padx=4)
+            self.title_label.pack(fill="x", pady=(6, 10), padx=self.PAD_X)
 
         self.content = ctk.CTkFrame(self, corner_radius=0, fg_color="transparent")
-        self.content.pack(fill="both", expand=True)
+        self.content.pack(fill="both", expand=True, padx=self.PAD_X)
 
     def refresh(self) -> None:
         """Re-pull derived data from AppState and update widgets."""

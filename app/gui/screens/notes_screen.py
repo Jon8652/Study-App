@@ -117,7 +117,7 @@ class NotesScreen(BaseScreen):
             font=ctk.CTkFont(size=17, weight="bold"), anchor="w", wraplength=460,
             corner_radius=0,
         )
-        self.detail_title.grid(row=0, column=0, sticky="ew", padx=16, pady=(14, 6))
+        self.detail_title.grid(row=0, column=0, sticky="ew", padx=24, pady=(14, 6))
 
         self.detail_body = ctk.CTkTextbox(
             self.detail_frame, font=ctk.CTkFont(size=13), wrap="word",
@@ -125,18 +125,18 @@ class NotesScreen(BaseScreen):
             border_width=1, border_color=BORDER,
         )
         # The textbox insets its text internally by max(corner_radius,
-        # border_width + 1) = 8 px, so use a smaller outer padx (16 - 8 = 8)
+        # border_width + 1) = 8 px, so use a smaller outer padx (24 - 8 = 16)
         # to keep the body text on the same left edge as the title above.
-        self.detail_body.grid(row=1, column=0, sticky="nsew", padx=8)
+        self.detail_body.grid(row=1, column=0, sticky="nsew", padx=16)
         self.detail_body.configure(state="disabled")
 
         actions = ctk.CTkFrame(self.detail_frame, fg_color="transparent")
-        actions.grid(row=2, column=0, sticky="ew", padx=16, pady=(10, 14))
+        actions.grid(row=2, column=0, sticky="ew", padx=24, pady=(10, 14))
         self.edit_button = ctk.CTkButton(actions, text="Edit note", width=110,
                                          height=32, corner_radius=8,
                                          command=self._edit_selected)
         # Buttons are solid filled controls: their *background* (not the
-        # inset text) should start at the card's 16 px content edge, like
+        # inset text) should start at the card's 24 px content edge, like
         # the "+ New note" button in the toolbar above.
         self.edit_button.pack(side="left", padx=(0, 8))
         self.delete_button = danger_button(
@@ -287,7 +287,7 @@ class NotesScreen(BaseScreen):
                 font=ctk.CTkFont(size=13),
                 text_color=MUTED_TEXT,
                 anchor="w", corner_radius=0,
-            ).pack(fill="x", pady=18, padx=(15, 6))
+            ).pack(fill="x", pady=18, padx=(9, 6))
             return
 
         for note in notes:
@@ -335,7 +335,9 @@ class NotesScreen(BaseScreen):
             # landed at canvas-inset + 15 (pack padx 6 + border 1 + the
             # button's own max(corner_radius, border+1) = 8 px gutter).
             # pack padx=(9, 6) + frame border 1 + label padx 4 reproduces
-            # that exact left edge for every line of every row.
+            # that exact left edge for every line of every row.  With the
+            # screen-wide 24 px left gap (list frame starts at 36 → canvas
+            # inset 9), padx=(9, 6) puts row text back on the 24 px line.
             row.pack(fill="x", padx=(9, 6), pady=3)
             # Make the whole card clickable like the old button rows.
             row.bind("<Button-1>", lambda _e, nid=note.id: self._select(nid))
@@ -359,7 +361,7 @@ class NotesScreen(BaseScreen):
         self.detail_empty.place_forget()
         self.detail_empty.grid_forget()
         self.detail_title.grid(row=0, column=0, sticky="ew",
-                               padx=16, pady=(14, 6))
+                               padx=24, pady=(14, 6))
         # padx=8 matches the textbox's internal 8 px text inset so the body
         # text starts on the same left edge as the title (see __init__).
         self.detail_body.grid(row=1, column=0, sticky="nsew", padx=8)
