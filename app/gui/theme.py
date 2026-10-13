@@ -30,8 +30,13 @@ TIME_BLUE = ("#22589d", "#6ea8e0")
 XP_GOLD = ("#a6821f", "#d4af37")
 
 # --- Neutral / semantic buttons ----------------------------------------------
-NEUTRAL = (("gray80", "#dfe4ea"), ("gray72", "#d3d9e0"))
-NEUTRAL_TEXT = ("gray10", "gray5")
+# NOTE: customtkinter accepts either a plain colour string or a *flat* tuple of
+# exactly two strings – one per appearance mode (light, dark).  Nesting pairs
+# inside the tuple (e.g. (("a","b"),("c","d"))) raises ValueError at widget
+# construction time.
+NEUTRAL = ("#dfe4ea", "gray28")
+NEUTRAL_HOVER = ("#d3d9e0", "gray35")
+NEUTRAL_TEXT = ("gray10", "gray92")
 DANGER = ("#8b3030", "#b04040")
 DANGER_HOVER = ("#a33d3d", "#c44e4e")
 
@@ -65,7 +70,7 @@ def neutral_button(master=None, text: str = "", width: int = 100,
         width=width,
         height=height,
         fg_color=NEUTRAL,
-        hover_color=NEUTRAL[1],
+        hover_color=NEUTRAL_HOVER,
         text_color=NEUTRAL_TEXT,
         command=command,
         **kwargs,

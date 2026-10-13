@@ -178,7 +178,12 @@ class MainWindow(ctk.CTk):
             button.configure(
                 fg_color=NAV_ACTIVE_BG if active else "transparent",
                 text_color=(ACCENT_TEXT if active else NAV_TEXT_INACTIVE),
-                hover_color="transparent" if active else NAV_HOVER,
+                # NOTE: customtkinter rejects the literal "transparent" for
+                # hover_color (ValueError); a no-op hover colour equal to the
+                # widget's own background keeps inactive pills calm.  The
+                # inactive pill's bg is transparent over SIDEBAR_FG, so reuse
+                # that as the flat no-hover colour.
+                hover_color=SIDEBAR_FG if active else NAV_HOVER,
             )
 
     def refresh_all(self) -> None:
