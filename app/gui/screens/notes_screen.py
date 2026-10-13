@@ -81,9 +81,25 @@ class NotesScreen(BaseScreen):
         # --- body: list + detail pane ---------------------------------------
         body = ctk.CTkFrame(self.content, fg_color="transparent")
         body.pack(fill="both", expand=True)
-        body.grid_columnconfigure(0, weight=5)
-        body.grid_columnconfigure(1, weight=6)
+        # FIXED 50/50 split for the two panes.  A plain weighted grid is not
+        # enough: Tk treats each pane's *requested* width as a minimum, so
+        # selecting a calendar note (extra "Open day" button in the action
+        # row, different title-wrap height) enlarged the detail pane's
+        # request and squeezed "All notes" — the split visibly changed
+        # between note types.  Instead of fighting every child's requested
+        # size, both columns get an identical fixed base width (half the
+        # window minus half the gap) via minsize + uniform, and the
+        # <Configure> handler below keeps that base at half the available
+        # width on every resize.  The split is then mathematically identical
+        # for all notes, at any window size.
+        self._split_w = max(240, self.winfo_toplevel().winfo_width() // 2
+                            - CARD_PAD_X)
+        body.grid_columnconfigure(0, weight=1, uniform="note_split",
+                                  minsize=self._split_w)
+        body.grid_columnconfigure(1, weight=1, uniform="note_split",
+                                  minsize=self._split_w)
         body.grid_rowconfigure(0, weight=1)
+        body.bind("<Configure>", self._on_body_configure, add="+")
 
         self.list_frame = ctk.CTkScrollableFrame(
             body, label_text="All notes", corner_radius=12,
@@ -116,9 +132,14 @@ class NotesScreen(BaseScreen):
 
         # CTkLabel indents its inner text by min(corner_radius, height/2);
         # corner_radius=0 keeps the title at exactly the grid padx edge.
+        # No wraplength: with a fixed width the label's requested size would
+        # change whenever a longer note title is selected, which drags the
+        # grid's proportional column split around (the "All notes" pane
+        # resized when picking calendar vs regular notes).  anchor="w" +
+        # sticky="ew" left-aligns the title in every pane width instead.
         self.detail_title = ctk.CTkLabel(
             self.detail_frame, text="",
-            font=ctk.CTkFont(size=17, weight="bold"), anchor="w", wraplength=460,
+            font=ctk.CTkFont(size=17, weight="bold"), anchor="w",
             corner_radius=0,
         )
         self.detail_title.grid(row=0, column=0, sticky="ew",
@@ -184,12 +205,37 @@ class NotesScreen(BaseScreen):
         # Packed LAST (after all left-side buttons) so it only ever claims
         # leftover space; see _render_detail for the full packing order.
         self.detail_meta.pack(side="right")
+        # Keep this label's requested width constant across renders.  Tk
+        # refuses to pack a widget *before* a sibling whose requested size
+        # changed since the last geometry pass ("isn't packed" TclError),
+        # which used to crash note selection when switching between notes
+        # with different "Updated …" timestamps.  A fixed-width slot makes
+        # the label's request static — and also keeps the action row's
+        # minimum width identical for every note, so the list/detail split
+        # never changes with the selection.
+        self._META_SLOT = 150
+        self.detail_meta.configure(width=self._META_SLOT)
+        # The meta label is permanently managed: _render_detail() must never
+        # pack_forget()/re-pack it, because a re-packed slave loses its
+        # "packed" status in Tk and using it as a `before=` anchor then
+        # raises TclError("... isn't packed").  Visibility is controlled by
+        # text content instead (blank when no note is selected).
 
         self.detail_empty = self.show_empty_state(
             self.detail_frame,
             "Select a note on the left, or create one with “New note”.\n"
             "Notes attached to a day also show up on that day in the Calendar.",
         )
+        # The empty-state frame is grid-placed in the detail pane and its
+        # requested width (image + wrapped message) changes with font
+        # metrics/theme refreshes.  Tk refuses to pack() a widget *before* a
+        # sibling whose requested size changed since the last geometry pass,
+        # raising TclError("... isn't packed") when re-selecting a calendar
+        # note after the empty state was shown.  Forgetting it once here
+        # resets its pack-slave status so it can never participate as a
+        # `before=` anchor; from then on it is only ever place()/grid-managed
+        # (see _render_detail), which does not affect the actions row.
+        self.detail_empty.grid_forget()
 
         self.refresh()
 
@@ -254,6 +300,21 @@ class NotesScreen(BaseScreen):
     def _run_search_refresh(self) -> None:
         self._search_debounce_id = None
         self.refresh()
+
+    def _on_body_configure(self, event) -> None:
+        """Keep the list/detail columns exactly 50/50 on every resize.
+
+        Both grid columns share one `uniform` group with an identical fixed
+        minsize; updating that minsize to half the body's width here means
+        the split never depends on the panes' (note-dependent) requested
+        sizes — selecting a calendar note vs a regular note cannot move the
+        divider.
+        """
+        w = max(240, int(event.width) // 2 - CARD_PAD_X)
+        if w != self._split_w:
+            self._split_w = w
+            event.widget.grid_columnconfigure(0, minsize=w)
+            event.widget.grid_columnconfigure(1, minsize=w)
 
     def refresh(self) -> None:
         """Called by AppState listeners after any data change."""
@@ -389,7 +450,9 @@ class NotesScreen(BaseScreen):
             self.edit_button.configure(state="disabled")
             self.delete_button.configure(state="disabled")
             self.open_day_button.pack_forget()
-            self.detail_meta.pack_forget()
+            # The meta label stays packed (it is the `before=` anchor for
+            # Open day); it just shows no text when nothing is selected.
+            self.detail_meta.configure(text="")
             return
 
         self.detail_empty.place_forget()
@@ -401,10 +464,24 @@ class NotesScreen(BaseScreen):
         # space.  A stable pack order keeps the row's requested width — and
         # therefore the list/detail split — the same for calendar-attached
         # and plain notes.
+        #
+        # IMPORTANT: never call grid_*() on the title/body while they are
+        # still grid-managed.  Changing their geometry options marks them as
+        # "pending reconfiguration" inside Tk, which makes the subsequent
+        # pack(before=self.detail_meta) below fail with
+        # TclError("... isn't packed") when switching from a plain note back
+        # to a calendar note.  Forgetting first guarantees clean state.
+        self.detail_title.grid_forget()
+        self.detail_body.grid_forget()
         half = self._ACTION_GAP // 2
         pad = (half, self._ACTION_GAP - half)
-        self.edit_button.pack(side="left", padx=pad)
-        self.delete_button.pack(side="left", padx=pad)
+        # Always insert at slot 0 of the actions frame (before Edit).  This
+        # both restores Edit/Delete after a previous render hid them (empty
+        # state) and guarantees the visual order
+        # Edit / Delete / [Open day] … Updated, without ever touching the
+        # permanently-packed meta label.
+        self.edit_button.pack(side="left", padx=pad, before=self.delete_button)
+        self.delete_button.pack(side="left", padx=pad, before=self.open_day_button)
 
         self.detail_title.grid(row=0, column=0, sticky="ew",
                                padx=CARD_PAD_X, pady=(14, 6))
@@ -438,9 +515,11 @@ class NotesScreen(BaseScreen):
         else:
             self.open_day_button.pack_forget()
 
-        # "Updated …" only (the day date was removed from this label):
-        # packed LAST in the fixed order above, so it always claims just
-        # the leftover space at the right edge of the action row.
-        self.detail_meta.pack(side="right")
+        # "Updated …" only (the day date was removed from this label).
+        # The meta label is packed permanently in __init__ and never
+        # forgotten — re-packing it here would leave Tk without a valid
+        # `before=` anchor on the next calendar-note render
+        # (TclError "... isn't packed"); it already sits at the right edge
+        # of the action row and only claims leftover space.
         self.detail_meta.configure(
             text=f"Updated {note.updated_at_local:%Y-%m-%d %H:%M}")
