@@ -4,17 +4,18 @@ Month grid with medal indicators, prev/next/today navigation, and a modal
 day-details dialog on day click. Initial view is the current month; the last
 viewed month is preserved while the app runs.
 
-Days that have notes show a small note-count marker in the cell, and the
-notes themselves are listed inside the day-details dialog.
+Tile contents: just the date number, with tiny markers underneath — a small
+medal icon when the day earned bronze/silver/gold, and a memo-emoji note
+marker when the day has notes attached. The notes themselves are listed
+inside the day-details dialog.
 
-Colour scheme: plain day tiles are light grey in light mode (dark grey in
-dark mode); today's tile uses the same blue accent as the "Today" button in
-the header so the two match; medal days use bronze/silver/gold accents.
-The selected day gets an accent-blue outline ring so it stays visible even
-when its fill colour is neutral.  Date-number colours follow light/dark
-mode switches automatically (an appearance-mode watcher recolours the
-rendered cells immediately, so no month navigation is needed after
-toggling the theme).
+Colour scheme: day tiles are light grey in light mode (dark grey in dark
+mode); today's tile uses the same blue accent as the "Today" button in the
+header so the two match. The selected day gets an accent-blue outline ring
+so it stays visible even when its fill colour is neutral.  Date-number
+colours follow light/dark mode switches automatically (an appearance-mode
+watcher recolours the rendered cells immediately, so no month navigation is
+needed after toggling the theme).
 """
 
 from __future__ import annotations
@@ -24,26 +25,20 @@ from datetime import date
 
 import customtkinter as ctk
 
+from app.core.medals import MEDAL_ASSET_KEYS
 from app.gui.dialogs.day_details_dialog import DayDetailsDialog
 from app.gui.screens.base_screen import BaseScreen
 from app.gui.theme import ACCENT, BORDER, CARD_FG, MUTED_TEXT
-from app.utils.date_utils import add_months, format_minutes
+from app.utils.date_utils import add_months
+from app.utils.resources import load_photo
 
 WEEKDAY_LABELS = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
 
 NOTE_MARKER = "\U0001F4DD"  # memo emoji shown when a day has notes
 
-MEDAL_FG = {
-    "bronze": ("#8a5a33", "#c08a58"),
-    "silver": ("#7d8894", "#aab4bf"),
-    "gold":   ("#a6821f", "#d4af37"),
-}
-
-MEDAL_HOVER = {
-    "bronze": ("#7a4e2c", "#b07e50"),
-    "silver": ("#6d7884", "#9aa4af"),
-    "gold":   ("#96731c", "#c4a02f"),
-}
+# Tile fills are deliberately neutral (grey / today-blue): medals are shown
+# as a small icon under the date instead of colouring the whole tile.
+MEDAL_ICON_SIZE = 14  # px — same scale as the tiny note marker line
 
 # Shared accent for the Today tile and the Today button (both blue).
 TODAY_BLUE = ACCENT
@@ -97,8 +92,9 @@ class CalendarScreen(BaseScreen):
                 text_color=MUTED_TEXT,
             ).grid(row=0, column=col, sticky="nsew", padx=2, pady=(10, 4))
 
-        self._cells: dict[date, ctk.CTkButton] = {}
-        self._plain_cells: list[ctk.CTkButton] = []
+        # Day tiles: plain days are CTkButtons; medal days are composite
+        # CTkFrames (date button + tiny medal-icon label) — see _make_day_cell.
+        self._cells: dict[date, ctk.CTkButton | ctk.CTkFrame] = {}
         # Tk binding tag used to hook <Destroy> on the app's root window so we
         # can detach the appearance-mode watcher without leaving a stale
         # callback behind (see _on_root_destroy).
@@ -166,24 +162,18 @@ class CalendarScreen(BaseScreen):
 
         Only the *text* colour needs adjusting on a theme switch: tile
         background colours are (fg, dark) tuples that customtkinter resolves
-        against the new mode automatically.
+        against the new mode automatically.  Medal icons live in separate
+        CTkLabel children and need no recolouring.
         """
-        for cell in self._plain_cells:
+        today = date.today()
+        for day, cell in list(self._cells.items()):
+            # Composite (medal) tiles keep their date button inside a frame
+            # — recolour that instead of the frame itself.
+            target = getattr(cell, "num_button", cell)
             try:
-                cell.configure(text_color=self._cell_text_color(is_plain=True))
+                target.configure(text_color=self._cell_text_color(day == today))
             except Exception:
                 pass  # cell may have been destroyed mid-teardown
-        for day, cell in self._cells.items():
-            if cell in self._plain_cells:
-                continue
-            # Today's tile is always white text; medal tiles keep their
-            # (light-mode-dark-text, dark-mode-white) tuple — identical to
-            # the value assigned at render time.
-            text = "white" if day == date.today() else self._cell_text_color(False)
-            try:
-                cell.configure(text_color=text)
-            except Exception:
-                pass
 
     # --- navigation -----------------------------------------------------------
 
@@ -208,11 +198,93 @@ class CalendarScreen(BaseScreen):
     # --- rendering --------------------------------------------------------------
 
     @staticmethod
-    def _cell_text_color(is_plain: bool) -> str:
-        """Plain tiles are light grey in light mode, so use dark text there."""
-        if is_plain and ctk.get_appearance_mode().lower() == "light":
-            return "gray10"
-        return "white"
+    def _cell_text_color(is_today: bool) -> str:
+        """Pick the date-number colour for a tile.
+
+        Today's tile is always blue (both themes) with white text; every
+        other tile is grey — light grey in light mode, so it needs dark
+        text there and white text on the dark-grey fill in dark mode.
+        """
+        if is_today or ctk.get_appearance_mode().lower() != "light":
+            return "white"
+        return "gray10"
+
+    def _make_day_cell(self, day, *, medal, note_marker, fg, hover,
+                       is_today, selected):
+        """Build one day tile.
+
+        Tiles show just the date number; when the day has a medal, a tiny
+        medal icon (and note marker, if any) sits underneath it.  CTkButton
+        cannot embed an image next to its text, so medal days use a
+        composite clickable CTkFrame (date button + icon label); every other
+        day is a plain button.
+        """
+        icon = load_photo(MEDAL_ASSET_KEYS[medal], size=MEDAL_ICON_SIZE) \
+            if medal in MEDAL_ASSET_KEYS else None
+
+        text_color = self._cell_text_color(is_today)
+        # The date line: plain days put the note marker on a second line of
+        # the button text; medal days handle it inside the composite tile.
+        date_text = str(day.day)
+        if note_marker and icon is None:
+            date_text += f"\n{note_marker}"
+
+        if icon is None:
+            cell = ctk.CTkButton(
+                self.grid_frame,
+                text=date_text,
+                font=ctk.CTkFont(size=12),
+                height=58,
+                corner_radius=8,
+                fg_color=fg,
+                hover_color=hover,
+                text_color=text_color,
+                border_width=2 if selected else 0,
+                # NOTE: customtkinter forbids the literal "transparent" for
+                # border_color (raises ValueError); a theme-aware colour is
+                # safe and invisible anyway while border_width is 0.
+                border_color=ACCENT if selected else BORDER,
+                command=lambda d=day: self._open_day(d),
+            )
+            cell._is_day_cell = True
+            return cell
+
+        # Composite tile: outer frame carries the fill/selection ring; the
+        # inner button (date only, transparent fill) stays clickable.
+        frame = ctk.CTkFrame(
+            self.grid_frame,
+            corner_radius=8,
+            fg_color=fg,
+            border_width=2 if selected else 0,
+            border_color=ACCENT if selected else BORDER,
+        )
+        frame._is_day_cell = True
+
+        num_button = ctk.CTkButton(
+            frame,
+            text=str(day.day),
+            font=ctk.CTkFont(size=12),
+            height=34,
+            width=0,
+            corner_radius=6,
+            fg_color="transparent",
+            hover_color=hover,
+            text_color=text_color,
+            command=lambda d=day: self._open_day(d),
+        )
+        num_button.pack(expand=True, fill="both", padx=2, pady=(3, 0))
+
+        icon_label = ctk.CTkLabel(
+            frame,
+            image=icon,
+            text=note_marker,
+            font=ctk.CTkFont(size=9),
+            compound="left",
+        )
+        icon_label.pack(pady=(0, 4))
+
+        frame.num_button = num_button
+        return frame
 
     def _render(self) -> None:
         for child in self.grid_frame.winfo_children():
@@ -224,7 +296,6 @@ class CalendarScreen(BaseScreen):
                 except Exception:
                     pass
         self._cells.clear()
-        self._plain_cells.clear()
         # The grid was just rebuilt with colours correct for the *current*
         # mode; keep the watcher's cached mode in sync so it does not fire a
         # redundant recolour on its next tick.
@@ -248,50 +319,34 @@ class CalendarScreen(BaseScreen):
                 day = date(self._year, self._month, day_num)
                 aggregate = aggregates.get(day)
 
-                text = str(day_num)
-                if aggregate:
-                    text += f"\n{format_minutes(aggregate.total_minutes)}"
-                    if aggregate.medal:
-                        text = f"{aggregate.medal[0].upper()} \u00b7 {text}"
-
                 notes_count = note_counts.get(day, 0)
                 if notes_count:
-                    marker = f"{NOTE_MARKER}{notes_count}" if notes_count > 1 \
+                    note_marker = f"{NOTE_MARKER}{notes_count}" if notes_count > 1 \
                         else NOTE_MARKER
-                    text += f"\n{marker}"
+                else:
+                    note_marker = ""
 
-                fg = MEDAL_FG.get(aggregate.medal) if aggregate else None
-                hover = MEDAL_HOVER.get(aggregate.medal) if aggregate else None
-                if day == today:
-                    # Match the Today button in the header (both blue).
+                # Tiles stay neutral grey; only today is blue (matching the
+                # Today button).  Medals show as a small icon under the date.
+                is_today = day == today
+                if is_today:
                     fg, hover = TODAY_BLUE, TODAY_BLUE_HOVER
-                is_plain = fg is None
-                if is_plain:
+                else:
                     # Light grey tiles in light mode, dark grey in dark mode.
                     fg, hover = PLAIN_FG, PLAIN_HOVER
 
                 selected = day == self._selected
-                cell = ctk.CTkButton(
-                    self.grid_frame,
-                    text=text,
-                    font=ctk.CTkFont(size=12),
-                    height=58,
-                    corner_radius=8,
-                    fg_color=fg,
-                    hover_color=hover,
-                    text_color=self._cell_text_color(is_plain),
-                    border_width=2 if selected else 0,
-                    # NOTE: customtkinter forbids the literal "transparent" for
-                    # border_color (raises ValueError); a theme-aware colour is
-                    # safe and invisible anyway while border_width is 0.
-                    border_color=ACCENT if selected else BORDER,
-                    command=lambda d=day: self._open_day(d),
+                cell = self._make_day_cell(
+                    day,
+                    medal=(aggregate.medal if aggregate else None),
+                    note_marker=note_marker,
+                    fg=fg,
+                    hover=hover,
+                    is_today=is_today,
+                    selected=selected,
                 )
-                cell._is_day_cell = True
                 cell.grid(row=week_index, column=col, sticky="nsew", padx=2, pady=2)
                 self._cells[day] = cell
-                if is_plain:
-                    self._plain_cells.append(cell)
 
         for col in range(7):
             self.grid_frame.grid_columnconfigure(col, weight=1)
