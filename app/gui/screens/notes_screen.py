@@ -25,7 +25,6 @@ from app.gui.dialogs.note_editor_dialog import NoteEditorDialog
 from app.gui.screens.base_screen import BaseScreen
 from app.gui.theme import (
     ACCENT,
-    ALL_NOTES_CHIP_LIGHT,
     ALL_NOTES_CHIP_TEXT,
     BORDER,
     DETAIL_CARD_FG,
@@ -88,21 +87,17 @@ class NotesScreen(BaseScreen):
 
         self.list_frame = ctk.CTkScrollableFrame(
             body, label_text="All notes", corner_radius=12,
-            fg_color=DETAIL_CARD_FG, border_width=1, border_color=BORDER,
+            fg_color=DETAIL_CARD_FG, border_width=0,
             label_font=ctk.CTkFont(size=13, weight="bold"),
-            # Replace the theme's grey header chip ("gray78"/"gray23") with a
-            # blue tint that matches the rest of the palette — lighter in light
-            # mode, darker in dark mode.
-            label_fg_color=ALL_NOTES_CHIP_LIGHT,
+            # No box/chip around the "All notes" header: transparent fill and
+            # zero corner radius so it renders as plain left-aligned text.
+            label_fg_color="transparent",
             label_text_color=ALL_NOTES_CHIP_TEXT,
-            # Left-align the "All notes" header (the default is centered).
             label_anchor="w",
         )
-        # The scroll frame's header is a CTkLabel created with
-        # corner_radius = frame corner_radius (12), which gives it customtkinter's
-        # hidden internal text inset of min(corner_radius, height/2) = 6 px —
-        # that pushed "All notes" 6 px right of the note rows.  Zero it so the
-        # header text starts at exactly the same x as the row buttons below.
+        # CTkScrollableFrame hard-codes the header label's corner_radius to the
+        # frame's value; zero it so no rounded background can appear behind the
+        # text even if the theme overrides label_fg_color.
         for _child in self.list_frame._parent_frame.winfo_children():
             if isinstance(_child, ctk.CTkLabel):
                 _child.configure(corner_radius=0)
