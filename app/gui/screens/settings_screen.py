@@ -4,6 +4,9 @@
 - Manual Save writes current state immediately (FR-59).
 - Manual Load: file chooser -> validate -> confirm -> backup + replace (Flow 4).
 - Data status area: save location, total sessions, last saved, backup status.
+
+Sections are presented as bordered cards with a small icon next to each
+heading; the active theme button is highlighted with the accent colour.
 """
 
 from __future__ import annotations
@@ -14,9 +17,35 @@ from tkinter import filedialog
 from app.gui.dialogs.confirm_dialog import ask_yes_no
 from app.gui.dialogs.message_dialog import show_message
 from app.gui.screens.base_screen import BaseScreen
+from app.gui.theme import (
+    ACCENT,
+    ACCENT_HOVER,
+    MUTED_TEXT,
+    NEUTRAL,
+    NEUTRAL_TEXT,
+    card,
+    neutral_button,
+)
 from app.persistence import backup as backup_ops
 from app.utils.date_utils import format_dt
 from app.utils.paths import get_default_save_path
+
+
+def _section_card(parent, icon: str, title: str, subtitle: str) -> ctk.CTkFrame:
+    """A bordered settings card with an icon chip + heading + description."""
+    section = card(parent, corner_radius=14)
+    section.pack(fill="x", pady=(0, 12))
+
+    head = ctk.CTkFrame(section, fg_color="transparent")
+    head.pack(fill="x", padx=16, pady=(12, 2))
+    ctk.CTkLabel(head, text=icon, font=ctk.CTkFont(size=16)).pack(
+        side="left", padx=(0, 8))
+    ctk.CTkLabel(head, text=title,
+                 font=ctk.CTkFont(size=15, weight="bold")).pack(side="left")
+    ctk.CTkLabel(section, text=subtitle,
+                 font=ctk.CTkFont(size=12), text_color=MUTED_TEXT,
+                 anchor="w").pack(anchor="w", padx=16)
+    return section
 
 
 class SettingsScreen(BaseScreen):
@@ -25,57 +54,45 @@ class SettingsScreen(BaseScreen):
         self._on_theme_change = on_theme_change
 
         # --- Appearance ---------------------------------------------------------
-        section = ctk.CTkFrame(self.content, corner_radius=12)
-        section.pack(fill="x", pady=(0, 12))
-
-        ctk.CTkLabel(section, text="Appearance",
-                     font=ctk.CTkFont(size=15, weight="bold")).pack(
-            anchor="w", padx=16, pady=(12, 2))
-        ctk.CTkLabel(section, text="Choose how the app looks. Your choice is "
-                                   "saved automatically.",
-                     font=ctk.CTkFont(size=12),
-                     text_color=("gray40", "gray65")).pack(anchor="w", padx=16)
+        section = _section_card(
+            self.content, "\u263E", "Appearance",
+            "Choose how the app looks. Your choice is saved automatically.")
 
         theme_row = ctk.CTkFrame(section, fg_color="transparent")
         theme_row.pack(anchor="w", padx=16, pady=(8, 14))
         self.dark_button = ctk.CTkButton(
-            theme_row, text="Dark", width=110, command=lambda: self._set_theme("dark"))
+            theme_row, text="Dark", width=110, height=34, corner_radius=8,
+            command=lambda: self._set_theme("dark"))
         self.light_button = ctk.CTkButton(
-            theme_row, text="Light", width=110, fg_color="gray30",
-            hover_color="gray25", command=lambda: self._set_theme("light"))
+            theme_row, text="Light", width=110, height=34, corner_radius=8,
+            fg_color=NEUTRAL, hover_color=NEUTRAL[1], text_color=NEUTRAL_TEXT,
+            command=lambda: self._set_theme("light"))
         self.dark_button.pack(side="left", padx=(0, 8))
         self.light_button.pack(side="left")
 
         # --- Data management ------------------------------------------------------
-        data = ctk.CTkFrame(self.content, corner_radius=12)
-        data.pack(fill="x", pady=(0, 12))
-
-        ctk.CTkLabel(data, text="Data management",
-                     font=ctk.CTkFont(size=15, weight="bold")).pack(
-            anchor="w", padx=16, pady=(12, 2))
-        ctk.CTkLabel(data, text="Your data autosaves after every change. You can "
-                                "also save or load a file manually.",
-                     font=ctk.CTkFont(size=12),
-                     text_color=("gray40", "gray65")).pack(anchor="w", padx=16)
+        data = _section_card(
+            self.content, "\U0001F4BE", "Data management",
+            "Your data autosaves after every change. You can also save or "
+            "load a file manually.")
 
         buttons = ctk.CTkFrame(data, fg_color="transparent")
         buttons.pack(anchor="w", padx=16, pady=(8, 14))
-        ctk.CTkButton(buttons, text="Save now", width=120,
-                      command=self._manual_save).pack(side="left", padx=(0, 8))
-        ctk.CTkButton(buttons, text="Load from file", width=140, fg_color="gray30",
-                      hover_color="gray25", command=self._manual_load).pack(side="left")
+        ctk.CTkButton(buttons, text="Save now", width=120, height=34,
+                      corner_radius=8, command=self._manual_save).pack(
+            side="left", padx=(0, 8))
+        neutral_button(buttons, text="Load from file", width=140, height=34,
+                       command=self._manual_load).pack(side="left")
 
         # --- Status ------------------------------------------------------------------
-        status = ctk.CTkFrame(self.content, corner_radius=12)
-        status.pack(fill="x")
-        ctk.CTkLabel(status, text="Data status",
-                     font=ctk.CTkFont(size=15, weight="bold")).pack(
-            anchor="w", padx=16, pady=(12, 6))
+        status = _section_card(
+            self.content, "\u2139\uFE0F", "Data status",
+            "Where your data lives and when it was last written.")
         self.status_label = ctk.CTkLabel(
             status, text="", font=ctk.CTkFont(size=12),
-            text_color=("gray40", "gray65"), justify="left", anchor="w", wraplength=560,
+            text_color=MUTED_TEXT, justify="left", anchor="w", wraplength=560,
         )
-        self.status_label.pack(anchor="w", padx=16, pady=(0, 14))
+        self.status_label.pack(anchor="w", padx=16, pady=(6, 14))
 
         self.refresh()
 
@@ -150,11 +167,15 @@ class SettingsScreen(BaseScreen):
     def refresh(self) -> None:
         theme = self.state.settings.theme
         if theme == "dark":
-            self.dark_button.configure(fg_color="#2b6cb0", text="Dark \u2713")
-            self.light_button.configure(fg_color="gray30", text="Light")
+            self.dark_button.configure(fg_color=ACCENT, hover_color=ACCENT_HOVER,
+                                       text_color="white", text="Dark \u2713")
+            self.light_button.configure(fg_color=NEUTRAL, hover_color=NEUTRAL[1],
+                                         text_color=NEUTRAL_TEXT, text="Light")
         else:
-            self.light_button.configure(fg_color="#2b6cb0", text="Light \u2713")
-            self.dark_button.configure(fg_color="gray30", text="Dark")
+            self.light_button.configure(fg_color=ACCENT, hover_color=ACCENT_HOVER,
+                                        text_color="white", text="Light \u2713")
+            self.dark_button.configure(fg_color=NEUTRAL, hover_color=NEUTRAL[1],
+                                       text_color=NEUTRAL_TEXT, text="Dark")
 
         session_count = len(self.state.dataset.sessions)
         last_saved = self.state.dataset.updated_at
