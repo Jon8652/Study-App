@@ -20,6 +20,7 @@ from app.gui.screens.base_screen import BaseScreen
 from app.gui.theme import (
     ACCENT,
     ACCENT_HOVER,
+    CARD_PAD_X,
     MUTED_TEXT,
     NEUTRAL,
     NEUTRAL_HOVER,
@@ -38,18 +39,19 @@ def _section_card(parent, icon: str, title: str, subtitle: str) -> ctk.CTkFrame:
     section.pack(fill="x", pady=(0, 12))
 
     head = ctk.CTkFrame(section, fg_color="transparent")
-    head.pack(fill="x", padx=24, pady=(12, 2))
+    head.pack(fill="x", padx=CARD_PAD_X, pady=(12, 2))
     # CTkLabel indents its inner text by min(corner_radius, height/2)
     # (default corner radius 6 → a hidden ~6 px left inset).  Every label in
     # the card must set corner_radius=0, otherwise its text starts a few
-    # pixels right of the pack(padx=24) edge and sections stop lining up.
+    # pixels right of the pack(padx=CARD_PAD_X) edge and sections stop
+    # lining up.
     ctk.CTkLabel(head, text=icon, font=ctk.CTkFont(size=16),
                  corner_radius=0).pack(side="left", padx=(0, 8))
     ctk.CTkLabel(head, text=title, corner_radius=0,
                  font=ctk.CTkFont(size=15, weight="bold")).pack(side="left")
     ctk.CTkLabel(section, text=subtitle, corner_radius=0,
                  font=ctk.CTkFont(size=12), text_color=MUTED_TEXT,
-                 anchor="w").pack(anchor="w", padx=24)
+                 anchor="w").pack(anchor="w", padx=CARD_PAD_X)
     return section
 
 
@@ -64,7 +66,7 @@ class SettingsScreen(BaseScreen):
             "Choose how the app looks. Your choice is saved automatically.")
 
         theme_row = ctk.CTkFrame(section, fg_color="transparent")
-        theme_row.pack(anchor="w", padx=24, pady=(8, 14))
+        theme_row.pack(anchor="w", padx=CARD_PAD_X, pady=(8, 14))
         self.dark_button = ctk.CTkButton(
             theme_row, text="Dark", width=110, height=34, corner_radius=8,
             command=lambda: self._set_theme("dark"))
@@ -82,7 +84,7 @@ class SettingsScreen(BaseScreen):
             "load a file manually.")
 
         buttons = ctk.CTkFrame(data, fg_color="transparent")
-        buttons.pack(anchor="w", padx=24, pady=(8, 14))
+        buttons.pack(anchor="w", padx=CARD_PAD_X, pady=(8, 14))
         ctk.CTkButton(buttons, text="Save now", width=120, height=34,
                       corner_radius=8, command=self._manual_save).pack(
             side="left", padx=(0, 8))
@@ -98,11 +100,12 @@ class SettingsScreen(BaseScreen):
             text_color=MUTED_TEXT, justify="left", anchor="w", wraplength=560,
             # CTkLabel indents its inner text by min(corner_radius, height/2)
             # (default corner radius 6 here).  Zero it so the status text
-            # starts at exactly the same left edge (card padx=24) as the
+            # starts at exactly the same left edge (card padx=CARD_PAD_X)
+            # as the
             # Appearance and Data management sections below/above it.
             corner_radius=0,
         )
-        self.status_label.pack(anchor="w", padx=24, pady=(6, 14))
+        self.status_label.pack(anchor="w", padx=CARD_PAD_X, pady=(6, 14))
 
         self.refresh()
 

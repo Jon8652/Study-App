@@ -61,8 +61,18 @@ PRIMARY_TEXT = ("gray10", "white")
 # Uniform inset between the window/screen edge and everything on a screen
 # (titles, cards, buttons, text).  Every screen — Statistics included —
 # uses SCREEN_PAD_X so the left gap is identical for all boxes, buttons
-# and labels.
-SCREEN_PAD_X = 24
+# and labels.  The same value is applied on BOTH sides of the content
+# area (base_screen packs with padx=SCREEN_PAD_X), so the left and right
+# edge gaps are equal.  Reduced to half its original size (was 24 px).
+SCREEN_PAD_X = 12
+
+# Inner horizontal padding used inside bordered cards/panes (headings,
+# body text, buttons).  Kept equal to SCREEN_PAD_X so the gap between a
+# card's border and its contents matches the gap between the screen edge
+# and the card itself — uniform within and among all screens.  Cards are
+# packed flush against the screen's padded content frame, so their outer
+# left/right gaps come from SCREEN_PAD_X automatically.
+CARD_PAD_X = SCREEN_PAD_X
 
 # --- Notes screen surfaces -----------------------------------------------------
 # The right-hand detail card sits on a soft blue (a slightly deeper tint of the
