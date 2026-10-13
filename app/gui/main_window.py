@@ -30,6 +30,7 @@ from app.gui.theme import (
     NAV_ACTIVE_BG,
     NAV_HOVER,
     SIDEBAR_FG,
+    WINDOW_BG,
 )
 from app.persistence.schema import FRIENDLY_MESSAGES, FutureSchemaError
 from app.state.app_state import AppState
@@ -58,6 +59,12 @@ class MainWindow(ctk.CTk):
         ctk.set_default_color_theme("blue")
 
         self._app_state = app_state or AppState()
+
+        # Performance: paint the whole window with our own pale-blue/navy
+        # background *before* customtkinter inserts its default grey frame.
+        # Tk paints immediately on configure (no redraw wait), so the user
+        # sees the themed colour instantly instead of CTk's stock "gray92".
+        self.configure(fg_color=WINDOW_BG)
 
         self.title(WINDOW_TITLE)
         self.geometry(f"{WINDOW_WIDTH}x{WINDOW_HEIGHT}")
@@ -147,17 +154,23 @@ class MainWindow(ctk.CTk):
         self.content_area.grid_rowconfigure(0, weight=1)
         self.content_area.grid_columnconfigure(0, weight=1)
 
-        # --- screens (created once, cached) ------------------------------------
+        # --- screens (created lazily, cached) ----------------------------------
+        # PERFORMANCE: building all five screens up front meant ~50 calendar
+        # tiles + a full notes list were constructed *before* the window ever
+        # painted.  Screens are now instantiated on first visit instead; the
+        # dict starts with placeholders so callers can still enumerate keys.
         self.screens: dict[str, object] = {}
-        self.screens["home"] = HomeScreen(self.content_area, self._app_state)
-        self.screens["calendar"] = CalendarScreen(self.content_area, self._app_state)
-        self.screens["notes"] = NotesScreen(self.content_area, self._app_state)
-        self.screens["stats"] = StatsScreen(self.content_area, self._app_state)
-        self.screens["settings"] = SettingsScreen(
-            self.content_area, self._app_state, on_theme_change=self.apply_theme
-        )
-        for screen in self.screens.values():
-            screen.grid(row=0, column=0, sticky="nsew")
+        self._screen_factories = {
+            "home": lambda: HomeScreen(self.content_area, self._app_state),
+            "calendar": lambda: CalendarScreen(self.content_area, self._app_state),
+            "notes": lambda: NotesScreen(self.content_area, self._app_state),
+            "stats": lambda: StatsScreen(self.content_area, self._app_state),
+            "settings": lambda: SettingsScreen(
+                self.content_area, self._app_state,
+                on_theme_change=self.apply_theme),
+        }
+        for key in self._screen_factories:
+            self.screens[key] = None
 
         # Any data change refreshes every screen at once.
         self._app_state.add_listener(self.refresh_all)
@@ -169,9 +182,18 @@ class MainWindow(ctk.CTk):
 
     # ------------------------------------------------------------------------
 
+    def _get_screen(self, key: str):
+        """Instantiate (once) and place the screen registered under ``key``."""
+        screen = self.screens.get(key)
+        if screen is None:
+            screen = self._screen_factories[key]()
+            screen.grid(row=0, column=0, sticky="nsew")
+            self.screens[key] = screen
+        return screen
+
     def show_screen(self, key: str) -> None:
         self.current_screen_key = key
-        screen = self.screens[key]
+        screen = self._get_screen(key)
         screen.tkraise()
         for other_key, button in self._nav_buttons.items():
             active = other_key == key
@@ -187,7 +209,12 @@ class MainWindow(ctk.CTk):
             )
 
     def refresh_all(self) -> None:
+        # PERFORMANCE: only refresh screens that have actually been built.
+        # Unvisited (lazily-created) screens render fresh on first visit, so
+        # refreshing them here would both crash on None and waste time.
         for screen in self.screens.values():
+            if screen is None:
+                continue
             try:
                 screen.refresh()
             except Exception:

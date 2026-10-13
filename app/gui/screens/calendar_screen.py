@@ -49,10 +49,12 @@ TODAY_BLUE = ACCENT
 TODAY_BLUE_HOVER = "#255a94"
 
 # Plain-tile fills: a soft blue tint in light mode (so the grid harmonises
-# with the light-blue sidebar instead of clashing dark grey) and a subtle
-# blue-grey in dark mode.  Text stays legible on both ("gray10" / "white").
-PLAIN_FG = ("#d3e2f4", "#26263a")
-PLAIN_HOVER = ("#c3d6ee", "#313145")
+# with the light-blue sidebar instead of clashing dark grey) and, in dark
+# mode, a distinctly *lighter navy* than the calendar background — the old
+# "#26263a" was nearly invisible on CTk's dark frame, so tiles now stand
+# apart clearly while staying calm.  Text stays legible on both.
+PLAIN_FG = ("#d3e2f4", "#313147")
+PLAIN_HOVER = ("#c3d6ee", "#3d3d58")
 
 
 class CalendarScreen(BaseScreen):

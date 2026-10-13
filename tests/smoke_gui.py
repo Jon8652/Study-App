@@ -94,7 +94,7 @@ def main() -> int:
     dd.destroy()
 
     # 6. Calendar month navigation preserves viewed month across refreshes.
-    cal = app.screens["calendar"]
+    cal = app._get_screen("calendar")  # screens are lazily built now
     y0, m0 = cal._year, cal._month
     import datetime as _dt
     from calendar import monthrange

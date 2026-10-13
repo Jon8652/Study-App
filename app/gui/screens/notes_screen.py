@@ -73,7 +73,11 @@ class NotesScreen(BaseScreen):
             height=34, corner_radius=8,
         )
         self.search_entry.pack(side="right")
-        self.search_entry.bind("<KeyRelease>", lambda _e: self.refresh())
+        # PERFORMANCE: typing in the search box used to rebuild every note row
+        # on *each* keystroke (full list destroy + re-create).  Debounce the
+        # refresh to one render per 150 ms idle instead.
+        self._search_debounce_id: str | None = None
+        self.search_entry.bind("<KeyRelease>", self._on_search_key)
 
         # --- body: list + detail pane ---------------------------------------
         body = ctk.CTkFrame(self.content, fg_color="transparent")
@@ -213,6 +217,19 @@ class NotesScreen(BaseScreen):
         self._render_detail()
 
     # --- rendering -------------------------------------------------------------
+
+    def _on_search_key(self, _event=None) -> None:
+        """Debounce search typing: coalesce keystrokes into one refresh."""
+        if self._search_debounce_id is not None:
+            try:
+                self.after_cancel(self._search_debounce_id)
+            except Exception:
+                pass
+        self._search_debounce_id = self.after(150, self._run_search_refresh)
+
+    def _run_search_refresh(self) -> None:
+        self._search_debounce_id = None
+        self.refresh()
 
     def refresh(self) -> None:
         """Called by AppState listeners after any data change."""
