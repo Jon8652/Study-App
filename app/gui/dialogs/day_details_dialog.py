@@ -16,6 +16,7 @@ import customtkinter as ctk
 from app.core.medals import medal_label
 from app.gui.dialogs.confirm_dialog import ask_yes_no
 from app.gui.dialogs.note_editor_dialog import NoteEditorDialog
+from app.gui.theme import MUTED_TEXT
 from app.gui.widgets.medal_badge import MedalBadge
 from app.gui.widgets.session_row import SessionRow
 from app.state.app_state import AppState
@@ -155,13 +156,32 @@ class DayDetailsDialog(ctk.CTkToplevel):
             preview = note.body.strip().replace("\n", " ")
             if len(preview) > 120:
                 preview = preview[:117] + "…"
-            text = note.display_title()
+            # Title on the first line, the day's date underneath — both
+            # left-aligned like every other note listing.  CTkLabel has no
+            # per-line alignment of its own beyond `justify`, so the title
+            # and date are stacked labels packed to the left edge (a single
+            # centred label with an embedded date used to render the date
+            # off to the side/centre for calendar-created notes).
+            day_tag = note.day.strftime("%b %d") if note.day else ""
+            lines = [note.display_title()]
+            if day_tag:
+                lines.append(day_tag)
+            title_text = "\n".join(lines)
+            title_label = ctk.CTkLabel(
+                row, text=title_text, font=ctk.CTkFont(size=12),
+                anchor="w", justify="left", wraplength=380,
+            )
+            title_label.pack(side="left", padx=(12, 6), pady=(8, 0), fill="x")
             if preview:
-                text += f"\n{preview}"
-            ctk.CTkLabel(
-                row, text=text, font=ctk.CTkFont(size=12), anchor="w",
-                justify="left", wraplength=380,
-            ).pack(side="left", padx=(12, 6), pady=8, fill="x", expand=True)
+                ctk.CTkLabel(
+                    row, text=preview, font=ctk.CTkFont(size=11),
+                    anchor="w", justify="left", wraplength=380,
+                    text_color=MUTED_TEXT,
+                ).pack(side="left", padx=(0, 6), pady=(0, 8), fill="x",
+                       expand=True)
+            else:
+                # Keep symmetric bottom padding when there is no preview.
+                title_label.configure(pady=(8, 8))
 
             button_row = ctk.CTkFrame(row, fg_color="transparent")
             button_row.pack(side="right", padx=(6, 10))

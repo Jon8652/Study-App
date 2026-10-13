@@ -247,13 +247,19 @@ class NotesScreen(BaseScreen):
             return
 
         for note in notes:
-            day_tag = f" · {note.day.strftime('%b %d')}" if note.day else ""
+            # Date tag as its own second line (not appended to the title):
+            # a CTkButton lays out multi-line text per `anchor`, so with
+            # anchor="w" both the title and the date stay left-aligned.
+            day_tag = note.day.strftime("%b %d") if note.day else ""
             preview = note.body.strip().replace("\n", " ")
             if len(preview) > 60:
                 preview = preview[:57] + "…"
-            text = f"{note.display_title()}{day_tag}"
+            lines = [note.display_title()]
+            if day_tag:
+                lines.append(day_tag)
             if preview:
-                text += f"\n{preview}"
+                lines.append(preview)
+            text = "\n".join(lines)
             selected = note.id == self._selected_note_id
             # NOTE: CTkButton has no `justify` option — passing one raises
             # ValueError in its __init__ *after* the widget is half-created,

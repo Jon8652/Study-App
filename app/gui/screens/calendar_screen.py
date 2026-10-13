@@ -7,7 +7,11 @@ viewed month is preserved while the app runs.
 Tile contents: just the date number, with tiny markers underneath — a small
 medal icon when the day earned bronze/silver/gold, and a memo-emoji note
 marker when the day has notes attached. The notes themselves are listed
-inside the day-details dialog.
+inside the day-details dialog.  Every tile is built as the same composite
+structure (date button on top, marker row underneath) so the date number
+sits at the identical vertical position in all tiles — including days that
+carry a note marker, a medal, or both (previously those variants stacked
+their content centred and floated the date higher than plain tiles).
 
 Colour scheme: day tiles are light grey in light mode (dark grey in dark
 mode); today's tile uses the same blue accent as the "Today" button in the
@@ -213,53 +217,39 @@ class CalendarScreen(BaseScreen):
                        is_today, selected):
         """Build one day tile.
 
-        Tiles show just the date number; when the day has a medal, a tiny
-        medal icon (and note marker, if any) sits underneath it.  CTkButton
-        cannot embed an image next to its text, so medal days use a
-        composite clickable CTkFrame (date button + icon label); every other
-        day is a plain button.
+        Every tile — plain, note-only, medal-only, or medal *and* note —
+        uses the exact same composite structure: an outer CTkFrame carrying
+        the fill/selection ring, a transparent date button packed at the
+        top with fixed padding, and a marker row packed underneath.  That
+        uniform layout is what keeps the date number vertically aligned
+        across the whole grid; previously note days were single multi-line
+        buttons and medal days had extra centred widgets, so their dates
+        floated higher than plain tiles'.
+
+        CTkButton cannot embed an image next to its text, which is why the
+        medal icon lives in its own label in the marker row.
         """
         icon = load_photo(MEDAL_ASSET_KEYS[medal], size=MEDAL_ICON_SIZE) \
             if medal in MEDAL_ASSET_KEYS else None
 
         text_color = self._cell_text_color(is_today)
-        # The date line: plain days put the note marker on a second line of
-        # the button text; medal days handle it inside the composite tile.
-        date_text = str(day.day)
-        if note_marker and icon is None:
-            date_text += f"\n{note_marker}"
 
-        if icon is None:
-            cell = ctk.CTkButton(
-                self.grid_frame,
-                text=date_text,
-                font=ctk.CTkFont(size=12),
-                height=58,
-                corner_radius=8,
-                fg_color=fg,
-                hover_color=hover,
-                text_color=text_color,
-                border_width=2 if selected else 0,
-                # NOTE: customtkinter forbids the literal "transparent" for
-                # border_color (raises ValueError); a theme-aware colour is
-                # safe and invisible anyway while border_width is 0.
-                border_color=ACCENT if selected else BORDER,
-                command=lambda d=day: self._open_day(d),
-            )
-            cell._is_day_cell = True
-            return cell
-
-        # Composite tile: outer frame carries the fill/selection ring; the
-        # inner button (date only, transparent fill) stays clickable.
+        # Outer frame: identical geometry for *every* day so the date
+        # numbers all sit on the same line within the tile.
         frame = ctk.CTkFrame(
             self.grid_frame,
             corner_radius=8,
             fg_color=fg,
             border_width=2 if selected else 0,
+            # NOTE: customtkinter forbids the literal "transparent" for
+            # border_color (raises ValueError); a theme-aware colour is
+            # safe and invisible anyway while border_width is 0.
             border_color=ACCENT if selected else BORDER,
         )
         frame._is_day_cell = True
 
+        # Date button: same height/padding everywhere, showing the number
+        # only — markers never touch the date line.
         num_button = ctk.CTkButton(
             frame,
             text=str(day.day),
@@ -272,8 +262,11 @@ class CalendarScreen(BaseScreen):
             text_color=text_color,
             command=lambda d=day: self._open_day(d),
         )
-        num_button.pack(expand=True, fill="both", padx=2, pady=(3, 0))
+        num_button.pack(fill="x", padx=2, pady=(3, 0))
 
+        # Marker row: always created (empty when the day has neither a
+        # medal nor notes) so the reserved space below the date is
+        # identical in all tiles.
         icon_label = ctk.CTkLabel(
             frame,
             image=icon,
