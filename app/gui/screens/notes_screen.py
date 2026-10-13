@@ -78,10 +78,17 @@ class NotesScreen(BaseScreen):
             body, label_text="All notes", corner_radius=12,
             fg_color=CARD_FG, border_width=1, border_color=BORDER,
             label_font=ctk.CTkFont(size=13, weight="bold"),
-            # Left-align the "All notes" header so it lines up with the
-            # left-aligned note rows below it (the default is centered).
+            # Left-align the "All notes" header (the default is centered).
             label_anchor="w",
         )
+        # The scroll frame's header is a CTkLabel created with
+        # corner_radius = frame corner_radius (12), which gives it customtkinter's
+        # hidden internal text inset of min(corner_radius, height/2) = 6 px —
+        # that pushed "All notes" 6 px right of the note rows.  Zero it so the
+        # header text starts at exactly the same x as the row buttons below.
+        for _child in self.list_frame._parent_frame.winfo_children():
+            if isinstance(_child, ctk.CTkLabel):
+                _child.configure(corner_radius=0)
         self.list_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 8))
 
         self.detail_frame = ctk.CTkFrame(
@@ -91,16 +98,11 @@ class NotesScreen(BaseScreen):
         self.detail_frame.grid_columnconfigure(0, weight=1)
         self.detail_frame.grid_rowconfigure(1, weight=1)
 
-        # Title only. The date / "updated" info used to sit in a second
-        # label on this same grid row; with long titles the wrapped title
-        # and the subtitle overlapped each other. The updated timestamp now
-        # lives in the bottom action row next to Delete instead.
+        # CTkLabel indents its inner text by min(corner_radius, height/2);
+        # corner_radius=0 keeps the title at exactly the grid padx edge.
         self.detail_title = ctk.CTkLabel(
             self.detail_frame, text="",
             font=ctk.CTkFont(size=17, weight="bold"), anchor="w", wraplength=460,
-            # CTkLabel indents its inner text by min(corner_radius, height/2)
-            # (default corner radius 6 here); zero it so the title starts at
-            # exactly the grid padx edge and lines up with the body text.
             corner_radius=0,
         )
         self.detail_title.grid(row=0, column=0, sticky="ew", padx=16, pady=(14, 6))
@@ -117,14 +119,13 @@ class NotesScreen(BaseScreen):
         self.detail_body.configure(state="disabled")
 
         actions = ctk.CTkFrame(self.detail_frame, fg_color="transparent")
-        actions.grid(row=2, column=0, sticky="ew", padx=8, pady=(10, 14))
+        actions.grid(row=2, column=0, sticky="ew", padx=16, pady=(10, 14))
         self.edit_button = ctk.CTkButton(actions, text="Edit note", width=110,
                                          height=32, corner_radius=8,
                                          command=self._edit_selected)
-        # CTkButton reserves an internal left gutter of
-        # max(corner_radius, border_width + 1) = 8 px before its text when
-        # anchored west; with the frame's padx=8 this puts "Edit note" on
-        # the same left edge as the title / body text.
+        # Buttons are solid filled controls: their *background* (not the
+        # inset text) should start at the card's 16 px content edge, like
+        # the "+ New note" button in the toolbar above.
         self.edit_button.pack(side="left", padx=(0, 8))
         self.delete_button = danger_button(
             actions, text="Delete", width=90, height=32,
@@ -251,13 +252,17 @@ class NotesScreen(BaseScreen):
 
         notes = self._filtered_notes()
         if not notes:
+            # corner_radius=0 cancels CTkLabel's hidden internal text inset
+            # (min(corner_radius, height/2) = 6 px by default); with padx=12
+            # the text then starts at the same x as the note-row text.
             ctk.CTkLabel(
                 self.list_frame,
                 text="No notes yet." if not self.state.dataset.notes
                      else "No notes match your search.",
                 font=ctk.CTkFont(size=13),
                 text_color=MUTED_TEXT,
-            ).pack(pady=18, padx=12)
+                anchor="w", corner_radius=0,
+            ).pack(fill="x", pady=18, padx=(15, 6))
             return
 
         for note in notes:
@@ -292,7 +297,14 @@ class NotesScreen(BaseScreen):
                 font=ctk.CTkFont(size=13),
                 command=lambda nid=note.id: self._select(nid),
             )
-            row.pack(fill="x", padx=6, pady=3)
+            # CTkButton reserves an internal left gutter of
+            # max(corner_radius, border_width + 1) = 8 px before its text.
+            # padx=11 keeps a small 3 px offset from the card's inner edge
+            # while cancelling most of that gutter, so the row *text* lands
+            # on the same x as the "All notes" header text (measured under
+            # Xvfb: both at canvas inset + 3). The row background still
+            # reads as a pill inset from the canvas edge.
+            row.pack(fill="x", padx=(11, 6), pady=3)
 
     def _render_detail(self) -> None:
         note = self._selected_note()

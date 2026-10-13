@@ -39,11 +39,15 @@ def _section_card(parent, icon: str, title: str, subtitle: str) -> ctk.CTkFrame:
 
     head = ctk.CTkFrame(section, fg_color="transparent")
     head.pack(fill="x", padx=16, pady=(12, 2))
-    ctk.CTkLabel(head, text=icon, font=ctk.CTkFont(size=16)).pack(
-        side="left", padx=(0, 8))
-    ctk.CTkLabel(head, text=title,
+    # CTkLabel indents its inner text by min(corner_radius, height/2)
+    # (default corner radius 6 → a hidden ~6 px left inset).  Every label in
+    # the card must set corner_radius=0, otherwise its text starts a few
+    # pixels right of the pack(padx=16) edge and sections stop lining up.
+    ctk.CTkLabel(head, text=icon, font=ctk.CTkFont(size=16),
+                 corner_radius=0).pack(side="left", padx=(0, 8))
+    ctk.CTkLabel(head, text=title, corner_radius=0,
                  font=ctk.CTkFont(size=15, weight="bold")).pack(side="left")
-    ctk.CTkLabel(section, text=subtitle,
+    ctk.CTkLabel(section, text=subtitle, corner_radius=0,
                  font=ctk.CTkFont(size=12), text_color=MUTED_TEXT,
                  anchor="w").pack(anchor="w", padx=16)
     return section
