@@ -6,6 +6,10 @@ viewed month is preserved while the app runs.
 
 Days that have notes show a small note-count marker in the cell, and the
 notes themselves are listed inside the day-details dialog.
+
+Colour scheme: plain day tiles are light grey in light mode (dark grey in
+dark mode); today's tile uses the same blue accent as the "Today" button in
+the header so the two match; medal days use bronze/silver/gold accents.
 """
 
 from __future__ import annotations
@@ -24,10 +28,20 @@ WEEKDAY_LABELS = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
 NOTE_MARKER = "\U0001F4DD"  # memo emoji shown when a day has notes
 
 MEDAL_FG = {
-    "bronze": "#8a5a33",
-    "silver": "#7d8894",
-    "gold":   "#a6821f",
+    "bronze": ("#8a5a33", "#c08a58"),
+    "silver": ("#7d8894", "#aab4bf"),
+    "gold":   ("#a6821f", "#d4af37"),
 }
+
+MEDAL_HOVER = {
+    "bronze": ("#7a4e2c", "#b07e50"),
+    "silver": ("#6d7884", "#9aa4af"),
+    "gold":   ("#96731c", "#c4a02f"),
+}
+
+# Shared accent for the Today tile and the Today button (both blue).
+TODAY_BLUE = "#2b6cb0"
+TODAY_BLUE_HOVER = "#255a94"
 
 
 class CalendarScreen(BaseScreen):
@@ -50,8 +64,13 @@ class CalendarScreen(BaseScreen):
         self.month_label.pack(side="left", padx=8)
         ctk.CTkButton(header, text="\u203a", width=40, height=32,
                       command=self._next_month).pack(side="left")
-        ctk.CTkButton(header, text="Today", width=80, height=32, fg_color="gray30",
-                      hover_color="gray25", command=self._go_today).pack(side="right")
+        # Same blue accent as today's tile so the two visually match.
+        self.today_button = ctk.CTkButton(
+            header, text="Today", width=80, height=32,
+            fg_color=TODAY_BLUE, hover_color=TODAY_BLUE_HOVER,
+            text_color="white", command=self._go_today,
+        )
+        self.today_button.pack(side="right")
 
         # --- grid ------------------------------------------------------------
         self.grid_frame = ctk.CTkFrame(self.content, corner_radius=12)
@@ -87,6 +106,13 @@ class CalendarScreen(BaseScreen):
         self._render()
 
     # --- rendering --------------------------------------------------------------
+
+    @staticmethod
+    def _cell_text_color(is_plain: bool) -> str:
+        """Plain tiles are light grey in light mode, so use dark text there."""
+        if is_plain and ctk.get_appearance_mode().lower() == "light":
+            return "gray10"
+        return "white"
 
     def _render(self) -> None:
         for child in self.grid_frame.winfo_children():
@@ -130,8 +156,14 @@ class CalendarScreen(BaseScreen):
                     text += f"\n{marker}"
 
                 fg = MEDAL_FG.get(aggregate.medal) if aggregate else None
-                if fg is None and day == today:
-                    fg = "#3a6ea5"
+                hover = MEDAL_HOVER.get(aggregate.medal) if aggregate else None
+                if day == today:
+                    # Match the Today button in the header (both blue).
+                    fg, hover = TODAY_BLUE, TODAY_BLUE_HOVER
+                is_plain = fg is None
+                if is_plain:
+                    # Light grey tiles in light mode, dark grey in dark mode.
+                    fg, hover = ("gray80", "gray18"), ("gray72", "gray25")
 
                 cell = ctk.CTkButton(
                     self.grid_frame,
@@ -139,9 +171,9 @@ class CalendarScreen(BaseScreen):
                     font=ctk.CTkFont(size=12),
                     height=58,
                     corner_radius=8,
-                    fg_color=fg or "gray18",
-                    hover_color=fg or "gray25",
-                    text_color="white",
+                    fg_color=fg,
+                    hover_color=hover,
+                    text_color=self._cell_text_color(is_plain),
                     command=lambda d=day: self._open_day(d),
                 )
                 cell._is_day_cell = True
