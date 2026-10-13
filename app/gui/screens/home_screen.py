@@ -42,7 +42,7 @@ class HomeScreen(BaseScreen):
         today_card.pack(fill="x", pady=(0, 16))
 
         header_row = ctk.CTkFrame(today_card, fg_color="transparent")
-        header_row.pack(fill="x", padx=18, pady=(14, 4))
+        header_row.pack(fill="x", padx=24, pady=(14, 4))
         ctk.CTkLabel(
             header_row, text="Today", font=ctk.CTkFont(size=16, weight="bold"),
             anchor="w",
@@ -53,7 +53,7 @@ class HomeScreen(BaseScreen):
         self.day_caption.pack(side="right")
 
         row = ctk.CTkFrame(today_card, fg_color="transparent")
-        row.pack(fill="x", padx=18, pady=(0, 6))
+        row.pack(fill="x", padx=24, pady=(0, 6))
 
         self.time_value = ctk.CTkLabel(
             row, text="0m", font=ctk.CTkFont(size=30, weight="bold"),
@@ -73,7 +73,7 @@ class HomeScreen(BaseScreen):
 
         # --- progress toward the next medal -----------------------------------
         progress_frame = ctk.CTkFrame(today_card, fg_color="transparent")
-        progress_frame.pack(fill="x", padx=18, pady=(2, 6))
+        progress_frame.pack(fill="x", padx=24, pady=(2, 6))
         self.progress_bar = ctk.CTkProgressBar(
             progress_frame, height=8, corner_radius=4,
             progress_color=ACCENT, fg_color=("gray82", "gray25"),
@@ -87,7 +87,7 @@ class HomeScreen(BaseScreen):
         self.progress_label.pack(side="left")
 
         medal_row = ctk.CTkFrame(today_card, fg_color="transparent")
-        medal_row.pack(fill="x", padx=18, pady=(0, 14))
+        medal_row.pack(fill="x", padx=24, pady=(0, 14))
         self.medal_badge = MedalBadge(medal_row, None, size=22)
         self.medal_badge.pack(side="left")
         self.medal_label = ctk.CTkLabel(

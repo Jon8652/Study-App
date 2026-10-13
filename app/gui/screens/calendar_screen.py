@@ -92,7 +92,9 @@ class CalendarScreen(BaseScreen):
         self.grid_frame = ctk.CTkFrame(
             self.content, corner_radius=14,
             fg_color=CARD_FG, border_width=1, border_color=BORDER)
-        self.grid_frame.pack(fill="both", expand=True)
+        # Small extra inset so the bordered grid panel doesn't sit flush
+        # against the window's right/bottom edges.
+        self.grid_frame.pack(fill="both", expand=True, padx=(0, 8), pady=(0, 8))
 
         for col, label in enumerate(WEEKDAY_LABELS):
             ctk.CTkLabel(
