@@ -1,0 +1,10 @@
+== NOTES (day-attached note selected) ==
+HEADER: x=25.0 'All notes'
+LISTROW: x=27.0 'First note|Oct 13|Body of first no'
+LISTROW: x=27.0 'Second|Another body'
+DETAIL: x=389.0 'First note'
+DETAIL: x=390.0 '<TEXT>'
+DETAIL: x=410.0 'Edit note'
+DETAIL: x=524.0 'Delete'
+DETAIL: x=611.0 'Open day'
+DETAIL: x=959.0 'Tuesday, October 13, 2026   ·   Up'
