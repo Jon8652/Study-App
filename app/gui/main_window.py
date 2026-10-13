@@ -32,6 +32,7 @@ from app.gui.theme import (
     SIDEBAR_FG,
     WINDOW_BG,
 )
+from app.gui.widgets.stopwatch import StopwatchWidget
 from app.persistence.schema import FRIENDLY_MESSAGES, FutureSchemaError
 from app.state.app_state import AppState
 from app.utils.paths import get_default_save_path
@@ -148,6 +149,12 @@ class MainWindow(ctk.CTk):
             self.sidebar, text=f"v{APP_VERSION}",
             font=ctk.CTkFont(size=10), text_color=("gray55", "gray45"),
         ).pack(side="bottom", pady=(0, 12))
+
+        # Digital stopwatch in the leftover sidebar space: pinned above the
+        # version label (which is packed side="bottom" first), directly under
+        # the nav/settings area.  Themed card look; works in light + dark.
+        self.stopwatch = StopwatchWidget(self.sidebar, self._app_state)
+        self.stopwatch.pack(side="bottom", fill="x", padx=12, pady=(16, 0))
 
         # Symmetric insets so the screen's left and right outer gaps match:
         # the content area sits 8 px from the window edge on both sides, and
