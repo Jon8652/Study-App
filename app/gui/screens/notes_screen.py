@@ -81,23 +81,20 @@ class NotesScreen(BaseScreen):
         # --- body: list + detail pane ---------------------------------------
         body = ctk.CTkFrame(self.content, fg_color="transparent")
         body.pack(fill="both", expand=True)
-        # FIXED 50/50 split for the two panes.  A plain weighted grid is not
-        # enough: Tk treats each pane's *requested* width as a minimum, so
-        # selecting a calendar note (extra "Open day" button in the action
-        # row, different title-wrap height) enlarged the detail pane's
-        # request and squeezed "All notes" — the split visibly changed
+        # FIXED 2:3 split ("All notes" smaller), independent of which note is
+        # selected.  A plain weighted grid is not enough: Tk treats each
+        # pane's *requested* width as a minimum, so selecting a calendar note
+        # (extra "Open day" button in the action row) enlarged the detail
+        # pane's request and squeezed "All notes" — the split visibly changed
         # between note types.  Instead of fighting every child's requested
-        # size, both columns get an identical fixed base width (half the
-        # window minus half the gap) via minsize + uniform, and the
-        # <Configure> handler below keeps that base at half the available
-        # width on every resize.  The split is then mathematically identical
-        # for all notes, at any window size.
-        self._split_w = max(240, self.winfo_toplevel().winfo_width() // 2
-                            - CARD_PAD_X)
-        body.grid_columnconfigure(0, weight=1, uniform="note_split",
-                                  minsize=self._split_w)
-        body.grid_columnconfigure(1, weight=1, uniform="note_split",
-                                  minsize=self._split_w)
+        # size, both columns get deterministic per-pane widths computed from
+        # the body width with exact 2:3 proportions (minus the inter-pane
+        # gap), via minsize + uniform, and the <Configure> handler below
+        # recomputes them on every resize.  The split is then mathematically
+        # identical for all notes, at any window size.
+        self._body = body
+        self._split_base_w = max(240, self.winfo_toplevel().winfo_width())
+        self._apply_split(self._split_base_w)
         body.grid_rowconfigure(0, weight=1)
         body.bind("<Configure>", self._on_body_configure, add="+")
 
@@ -163,6 +160,7 @@ class NotesScreen(BaseScreen):
                    padx=CARD_PAD_X, pady=(10, 14))
         # Uniform gap between all action buttons (Edit / Delete / Open day).
         self._ACTION_GAP = 8
+        self._actions_frame = actions
 
         def _gap_button(factory, **kwargs):
             """Build a themed button packed with *symmetric* padding.
@@ -205,16 +203,16 @@ class NotesScreen(BaseScreen):
         # Packed LAST (after all left-side buttons) so it only ever claims
         # leftover space; see _render_detail for the full packing order.
         self.detail_meta.pack(side="right")
-        # Keep this label's requested width constant across renders.  Tk
-        # refuses to pack a widget *before* a sibling whose requested size
-        # changed since the last geometry pass ("isn't packed" TclError),
-        # which used to crash note selection when switching between notes
-        # with different "Updated …" timestamps.  A fixed-width slot makes
-        # the label's request static — and also keeps the action row's
-        # minimum width identical for every note, so the list/detail split
-        # never changes with the selection.
-        self._META_SLOT = 150
-        self.detail_meta.configure(width=self._META_SLOT)
+        # IMPORTANT: never call configure(width=...) on this label once it
+        # is packed.  Changing a packed slave's requested size between
+        # geometry passes invalidates sibling pack positions inside Tk, and
+        # using it as a `before=` anchor then raises
+        # TclError("... isn't packed") — that was the exact crash when
+        # selecting a calendar note after viewing another note (the fixed
+        # 150 px "slot" below used to do exactly that on every render).
+        # The pane split no longer needs a static meta width: it is pinned
+        # deterministically via grid minsize/uniform (see _apply_split), so
+        # the label simply sizes itself to the "Updated …" text.
         # The meta label is permanently managed: _render_detail() must never
         # pack_forget()/re-pack it, because a re-packed slave loses its
         # "packed" status in Tk and using it as a `before=` anchor then
@@ -301,20 +299,42 @@ class NotesScreen(BaseScreen):
         self._search_debounce_id = None
         self.refresh()
 
-    def _on_body_configure(self, event) -> None:
-        """Keep the list/detail columns exactly 50/50 on every resize.
+    # Pane proportions of the notes body: "All notes" : detail = 2 : 3
+    # (the list pane is deliberately smaller than the reading pane).
+    _SPLIT_LIST_PART = 2
+    _SPLIT_DETAIL_PART = 3
 
-        Both grid columns share one `uniform` group with an identical fixed
-        minsize; updating that minsize to half the body's width here means
+    def _apply_split(self, total_w: int) -> None:
+        """Set the two body columns to an exact `_SPLIT_*` proportion.
+
+        Each column's *minsize* is its computed pixel width and both share
+        one `uniform` group, so Tk gives every extra pixel to both columns
+        equally while guaranteeing at least their proportional base width.
+        The result: the split is deterministic (never influenced by the
+        selected note's requested size) and stays at ~2:3 even when the
+        window is dragged below the natural minimum.
+        """
+        avail = max(240, int(total_w)) - CARD_PAD_X  # minus inter-pane gap
+        list_w = max(160, avail * self._SPLIT_LIST_PART
+                     // (self._SPLIT_LIST_PART + self._SPLIT_DETAIL_PART))
+        detail_w = max(240, avail - list_w)
+        self._body.grid_columnconfigure(0, weight=1, uniform="note_split",
+                                        minsize=list_w)
+        self._body.grid_columnconfigure(1, weight=1, uniform="note_split",
+                                        minsize=detail_w)
+
+    def _on_body_configure(self, event) -> None:
+        """Recompute the 2:3 column widths on every resize.
+
+        Because the minsize values are derived purely from the body width,
         the split never depends on the panes' (note-dependent) requested
         sizes — selecting a calendar note vs a regular note cannot move the
         divider.
         """
-        w = max(240, int(event.width) // 2 - CARD_PAD_X)
-        if w != self._split_w:
-            self._split_w = w
-            event.widget.grid_columnconfigure(0, minsize=w)
-            event.widget.grid_columnconfigure(1, minsize=w)
+        w = int(event.width)
+        if w != self._split_base_w:
+            self._split_base_w = w
+            self._apply_split(w)
 
     def refresh(self) -> None:
         """Called by AppState listeners after any data change."""
@@ -450,44 +470,40 @@ class NotesScreen(BaseScreen):
             self.edit_button.configure(state="disabled")
             self.delete_button.configure(state="disabled")
             self.open_day_button.pack_forget()
-            # The meta label stays packed (it is the `before=` anchor for
-            # Open day); it just shows no text when nothing is selected.
+            # The meta label stays packed; it just shows no text when
+            # nothing is selected.
             self.detail_meta.configure(text="")
             return
 
         self.detail_empty.place_forget()
         self.detail_empty.grid_forget()
-        # Re-pack the action row in a fixed order on every render:
-        # Edit / Delete / [Open day] left-packed with identical symmetric
-        # half-gap padding (uniform spacing between the buttons), then the
-        # right-packed "Updated …" label LAST so it only claims leftover
-        # space.  A stable pack order keeps the row's requested width — and
-        # therefore the list/detail split — the same for calendar-attached
-        # and plain notes.
-        #
-        # IMPORTANT: never call grid_*() on the title/body while they are
-        # still grid-managed.  Changing their geometry options marks them as
-        # "pending reconfiguration" inside Tk, which makes the subsequent
-        # pack(before=self.detail_meta) below fail with
-        # TclError("... isn't packed") when switching from a plain note back
-        # to a calendar note.  Forgetting first guarantees clean state.
-        self.detail_title.grid_forget()
-        self.detail_body.grid_forget()
+        # Re-pack the action row from a guaranteed-clean state on every
+        # render: forget all three buttons, then pack them in the fixed
+        # order Edit / Delete / [Open day] with identical symmetric half-gap
+        # padding (uniform spacing between the buttons), followed by the
+        # permanently-packed "Updated …" meta label claiming leftover space.
+        # Forgetting first is essential: re-issuing pack(before=...) while
+        # the slaves are still packed makes Tk compare stale internal
+        # positions against changed requested sizes, raising
+        # TclError("... isn't packed") — e.g. delete_button.pack(
+        # before=open_day_button) after open_day had been forgotten for a
+        # plain note.  A fresh pack sequence never references another
+        # slave's old position.
+        self.edit_button.pack_forget()
+        self.delete_button.pack_forget()
+        self.open_day_button.pack_forget()
         half = self._ACTION_GAP // 2
         pad = (half, self._ACTION_GAP - half)
-        # Always insert at slot 0 of the actions frame (before Edit).  This
-        # both restores Edit/Delete after a previous render hid them (empty
-        # state) and guarantees the visual order
-        # Edit / Delete / [Open day] … Updated, without ever touching the
-        # permanently-packed meta label.
-        self.edit_button.pack(side="left", padx=pad, before=self.delete_button)
-        self.delete_button.pack(side="left", padx=pad, before=self.open_day_button)
+        self.edit_button.pack(side="left", padx=pad)
+        self.delete_button.pack(side="left", padx=pad)
 
+        self.detail_title.grid_forget()
         self.detail_title.grid(row=0, column=0, sticky="ew",
                                padx=CARD_PAD_X, pady=(14, 6))
         # Outer padx = CARD_PAD_X minus the textbox's internal 8 px text
         # inset so the body text starts on the same left edge as the title
         # (see __init__).
+        self.detail_body.grid_forget()
         self.detail_body.grid(row=1, column=0, sticky="nsew",
                               padx=max(0, CARD_PAD_X - 8))
 
@@ -509,17 +525,16 @@ class NotesScreen(BaseScreen):
             # siblings, so the visual order stays
             # Edit / Delete / Open day | Updated… and the spacing between
             # the three buttons is uniformly _ACTION_GAP.
-            self.open_day_button.pack(side="left", padx=pad,
-                                      before=self.detail_meta)
+            self.open_day_button.pack(side="left", padx=pad)
             self.open_day_button.configure(state="normal")
         else:
             self.open_day_button.pack_forget()
 
         # "Updated …" only (the day date was removed from this label).
         # The meta label is packed permanently in __init__ and never
-        # forgotten — re-packing it here would leave Tk without a valid
-        # `before=` anchor on the next calendar-note render
-        # (TclError "... isn't packed"); it already sits at the right edge
-        # of the action row and only claims leftover space.
+        # forgotten — it already sits at the right edge of the action row
+        # and only claims leftover space.  All three buttons are freshly
+        # packed above (no `before=` anchors), so changing the meta text
+        # here can no longer invalidate sibling pack positions.
         self.detail_meta.configure(
             text=f"Updated {note.updated_at_local:%Y-%m-%d %H:%M}")
