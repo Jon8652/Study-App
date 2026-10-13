@@ -48,6 +48,22 @@ NAV_HOVER = ("#edf1f5", "#33333d")
 SIDEBAR_FG = ("#f2f4f8", "#1d1d28")
 MUTED_TEXT = ("gray40", "gray65")
 
+# --- Notes screen surfaces -----------------------------------------------------
+# The right-hand detail card sits on a soft blue (a slightly deeper tint of the
+# sidebar blue) instead of near-white grey, so it harmonises with the light-blue
+# sidebar in light mode and stays cohesive in dark mode.
+DETAIL_CARD_FG = ("#e7eff9", "#232331")
+# Unselected note-row fill: matches the detail card so the two panes read as one
+# surface; selection is still conveyed by the accent border + ACCENT title.
+NOTE_ROW_BG = ("#e7eff9", "#242430")
+
+# --- "All notes" header chip ---------------------------------------------------
+# CTkScrollableFrame's default label chip is grey (#c4c9ce / #3a3d41), which
+# clashes with the blue accents used everywhere else.  These tints sit closer to
+# the app palette: lighter/softer blue in light mode, darker in dark mode.
+ALL_NOTES_CHIP_LIGHT = ("#dbe7f5", "#1e2b3f")
+ALL_NOTES_CHIP_TEXT = ("#1a3a5c", "#cfe0f2")
+
 
 def card(master=None, corner_radius: int = 14, **kwargs):
     """Return a themed CTkFrame styled as an elevated card."""

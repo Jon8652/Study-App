@@ -48,9 +48,11 @@ MEDAL_ICON_SIZE = 14  # px — same scale as the tiny note marker line
 TODAY_BLUE = ACCENT
 TODAY_BLUE_HOVER = "#255a94"
 
-# Plain-tile fills: light grey in light mode, dark grey in dark mode.
-PLAIN_FG = ("gray80", "gray18")
-PLAIN_HOVER = ("gray72", "gray25")
+# Plain-tile fills: a soft blue tint in light mode (so the grid harmonises
+# with the light-blue sidebar instead of clashing dark grey) and a subtle
+# blue-grey in dark mode.  Text stays legible on both ("gray10" / "white").
+PLAIN_FG = ("#d3e2f4", "#26263a")
+PLAIN_HOVER = ("#c3d6ee", "#313145")
 
 
 class CalendarScreen(BaseScreen):
@@ -206,8 +208,8 @@ class CalendarScreen(BaseScreen):
         """Pick the date-number colour for a tile.
 
         Today's tile is always blue (both themes) with white text; every
-        other tile is grey — light grey in light mode, so it needs dark
-        text there and white text on the dark-grey fill in dark mode.
+        other tile uses the soft-blue PLAIN_FG tint — dark text in light
+        mode, white text on the darker fill in dark mode.
         """
         if is_today or ctk.get_appearance_mode().lower() != "light":
             return "white"

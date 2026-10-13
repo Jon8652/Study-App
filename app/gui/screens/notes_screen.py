@@ -25,9 +25,12 @@ from app.gui.dialogs.note_editor_dialog import NoteEditorDialog
 from app.gui.screens.base_screen import BaseScreen
 from app.gui.theme import (
     ACCENT,
+    ALL_NOTES_CHIP_LIGHT,
+    ALL_NOTES_CHIP_TEXT,
     BORDER,
-    CARD_FG,
+    DETAIL_CARD_FG,
     MUTED_TEXT,
+    NOTE_ROW_BG,
     danger_button,
     neutral_button,
 )
@@ -35,8 +38,13 @@ from app.utils.date_utils import format_date_long
 
 # Note-row fills: selected rows get a tinted accent background in dark mode
 # and a soft blue in light mode, so selection reads clearly in both themes.
-NOTE_ROW_SELECTED = ("#dbe7f5", "#2b3a52")
+NOTE_ROW_SELECTED = ("#cfe0f2", "#2b3a52")
 NOTE_ROW_HOVER = ("#eef1f5", "#31313d")
+
+# Unselected row titles must be as noticeable as the body text — use exactly
+# the same colour pair as the detail-pane textbox body (the resolved theme
+# default, ["gray10", "#DCE4EE"] under the blue theme), never a lighter grey.
+NOTE_TITLE_TEXT = ("gray10", "#DCE4EE")
 
 
 class NotesScreen(BaseScreen):
@@ -76,8 +84,13 @@ class NotesScreen(BaseScreen):
 
         self.list_frame = ctk.CTkScrollableFrame(
             body, label_text="All notes", corner_radius=12,
-            fg_color=CARD_FG, border_width=1, border_color=BORDER,
+            fg_color=DETAIL_CARD_FG, border_width=1, border_color=BORDER,
             label_font=ctk.CTkFont(size=13, weight="bold"),
+            # Replace the theme's grey header chip ("gray78"/"gray23") with a
+            # blue tint that matches the rest of the palette — lighter in light
+            # mode, darker in dark mode.
+            label_fg_color=ALL_NOTES_CHIP_LIGHT,
+            label_text_color=ALL_NOTES_CHIP_TEXT,
             # Left-align the "All notes" header (the default is centered).
             label_anchor="w",
         )
@@ -92,7 +105,7 @@ class NotesScreen(BaseScreen):
         self.list_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 8))
 
         self.detail_frame = ctk.CTkFrame(
-            body, corner_radius=12, fg_color=CARD_FG,
+            body, corner_radius=12, fg_color=DETAIL_CARD_FG,
             border_width=1, border_color=BORDER)
         self.detail_frame.grid(row=0, column=1, sticky="nsew")
         self.detail_frame.grid_columnconfigure(0, weight=1)
@@ -275,7 +288,7 @@ class NotesScreen(BaseScreen):
 
             row = ctk.CTkFrame(
                 self.list_frame, corner_radius=8,
-                fg_color=NOTE_ROW_SELECTED if selected else CARD_FG,
+                fg_color=NOTE_ROW_SELECTED if selected else NOTE_ROW_BG,
                 border_width=1,
                 border_color=ACCENT if selected else BORDER,
             )
@@ -302,7 +315,7 @@ class NotesScreen(BaseScreen):
                 ctk.CTkLabel(
                     row, text=txt, font=fnt, anchor="w", justify="left",
                     corner_radius=0,
-                    text_color=color if color is not None else ("gray90", "gray10"),
+                    text_color=color if color is not None else NOTE_TITLE_TEXT,
                 ).pack(fill="x", padx=4,
                        pady=((8, 2) if i == 0 else (0, 8) if i == len(labels) - 1 else 0))
 
