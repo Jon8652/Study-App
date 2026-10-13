@@ -92,9 +92,11 @@ class CalendarScreen(BaseScreen):
         self.grid_frame = ctk.CTkFrame(
             self.content, corner_radius=14,
             fg_color=CARD_FG, border_width=1, border_color=BORDER)
-        # Small extra inset so the bordered grid panel doesn't sit flush
-        # against the window's right/bottom edges.
-        self.grid_frame.pack(fill="both", expand=True, padx=(0, 8), pady=(0, 8))
+        # Packed flush into the content frame, whose own padx already gives
+        # an equal SCREEN_PAD_X gap on BOTH the left and right edges — no
+        # asymmetric extra inset here (that used to make the right gap
+        # smaller than the left one).
+        self.grid_frame.pack(fill="both", expand=True, pady=(0, 8))
 
         for col, label in enumerate(WEEKDAY_LABELS):
             ctk.CTkLabel(

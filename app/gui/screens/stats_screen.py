@@ -12,7 +12,7 @@ from __future__ import annotations
 import customtkinter as ctk
 
 from app.gui.screens.base_screen import BaseScreen
-from app.gui.theme import MUTED_TEXT
+from app.gui.theme import CARD_PAD_X, MUTED_TEXT
 from app.gui.widgets.summary_card import SummaryCard
 from app.utils.date_utils import format_minutes
 
@@ -22,7 +22,10 @@ class StatsScreen(BaseScreen):
         super().__init__(master, state, title="Statistics")
 
         self.scroll = ctk.CTkScrollableFrame(self.content, fg_color="transparent")
-        self.scroll.pack(fill="both", expand=True)
+        # padx=CARD_PAD_X gives the card grid a symmetric inset inside the
+        # content frame (which already adds SCREEN_PAD_X), so every screen —
+        # Statistics included — has an equal left and right outer gap.
+        self.scroll.pack(fill="both", expand=True, padx=CARD_PAD_X)
 
         self._cards: dict[str, SummaryCard] = {}
 
@@ -43,8 +46,12 @@ class StatsScreen(BaseScreen):
         def add_card(row, key: str, caption: str, col_span: int = 1,
                      color: str | None = None):
             card = SummaryCard(row, caption, color=color)
+            # Symmetric half-gap (CARD_PAD_X // 2 on each side) between cards:
+            # neighbours end up CARD_PAD_X apart and the outer edges line up
+            # with the scroll frame's own padx, keeping left/right uniform.
             card.grid(row=0, column=len(row.grid_slaves()), columnspan=col_span,
-                      padx=(0, 10), pady=4, sticky="nsew")
+                      padx=(CARD_PAD_X // 2, CARD_PAD_X // 2), pady=4,
+                      sticky="nsew")
             self._cards[key] = card
             return card
 

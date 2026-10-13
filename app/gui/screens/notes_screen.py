@@ -26,6 +26,7 @@ from app.gui.screens.base_screen import BaseScreen
 from app.gui.theme import (
     ACCENT,
     ALL_NOTES_CHIP_TEXT,
+    CARD_PAD_X,
     BORDER,
     DETAIL_CARD_FG,
     MUTED_TEXT,
@@ -100,7 +101,11 @@ class NotesScreen(BaseScreen):
         for _child in self.list_frame._parent_frame.winfo_children():
             if isinstance(_child, ctk.CTkLabel):
                 _child.configure(corner_radius=0)
-        self.list_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 8))
+        # The two panes are flush with the screen's left/right padded edges
+        # (no outer padx), so only a single CARD_PAD_X-wide gap sits between
+        # them — identical to the gaps used everywhere else.
+        self.list_frame.grid(row=0, column=0, sticky="nsew",
+                             padx=(0, CARD_PAD_X))
 
         self.detail_frame = ctk.CTkFrame(
             body, corner_radius=12, fg_color=DETAIL_CARD_FG,
@@ -116,7 +121,8 @@ class NotesScreen(BaseScreen):
             font=ctk.CTkFont(size=17, weight="bold"), anchor="w", wraplength=460,
             corner_radius=0,
         )
-        self.detail_title.grid(row=0, column=0, sticky="ew", padx=24, pady=(14, 6))
+        self.detail_title.grid(row=0, column=0, sticky="ew",
+                               padx=CARD_PAD_X, pady=(14, 6))
 
         self.detail_body = ctk.CTkTextbox(
             self.detail_frame, font=ctk.CTkFont(size=13), wrap="word",
@@ -124,13 +130,16 @@ class NotesScreen(BaseScreen):
             border_width=1, border_color=BORDER,
         )
         # The textbox insets its text internally by max(corner_radius,
-        # border_width + 1) = 8 px, so use a smaller outer padx (24 - 8 = 16)
-        # to keep the body text on the same left edge as the title above.
-        self.detail_body.grid(row=1, column=0, sticky="nsew", padx=16)
+        # border_width + 1) = 8 px, so use a smaller outer padx
+        # (CARD_PAD_X - 8) to keep the body text on the same left edge as
+        # the title above.
+        self.detail_body.grid(row=1, column=0, sticky="nsew",
+                              padx=max(0, CARD_PAD_X - 8))
         self.detail_body.configure(state="disabled")
 
         actions = ctk.CTkFrame(self.detail_frame, fg_color="transparent")
-        actions.grid(row=2, column=0, sticky="ew", padx=24, pady=(10, 14))
+        actions.grid(row=2, column=0, sticky="ew",
+                   padx=CARD_PAD_X, pady=(10, 14))
         # Uniform gap between all action buttons (Edit / Delete / Open day).
         self._ACTION_GAP = 8
 
@@ -292,14 +301,21 @@ class NotesScreen(BaseScreen):
             except Exception:
                 pass
 
+    def _row_padx(self) -> int:
+        """Horizontal pad that makes note rows flush with the list pane's
+        inner edges despite CTkScrollableFrame's built-in canvas inset."""
+        pf = self.list_frame._parent_frame
+        return int(pf.cget("corner_radius")) + int(pf.cget("border_width"))
+
     def _render_list(self) -> None:
         self._clear_children(self.list_frame)
 
         notes = self._filtered_notes()
         if not notes:
             # corner_radius=0 cancels CTkLabel's hidden internal text inset
-            # (min(corner_radius, height/2) = 6 px by default); with padx=12
-            # the text then starts at the same x as the note-row text.
+            # (min(corner_radius, height/2) = 6 px by default); with the
+            # row-alignment padx below, the text starts at the same x as
+            # the note-row text.
             ctk.CTkLabel(
                 self.list_frame,
                 text="No notes yet." if not self.state.dataset.notes
@@ -307,7 +323,7 @@ class NotesScreen(BaseScreen):
                 font=ctk.CTkFont(size=13),
                 text_color=MUTED_TEXT,
                 anchor="w", corner_radius=0,
-            ).pack(fill="x", pady=18, padx=(9, 6))
+            ).pack(fill="x", pady=18, padx=self._row_padx())
             return
 
         for note in notes:
@@ -351,14 +367,12 @@ class NotesScreen(BaseScreen):
                 ).pack(fill="x", padx=4,
                        pady=((8, 2) if i == 0 else (0, 8) if i == len(labels) - 1 else 0))
 
-            # The old (correctly aligned) rows were CTkButtons whose text
-            # landed at canvas-inset + 15 (pack padx 6 + border 1 + the
-            # button's own max(corner_radius, border+1) = 8 px gutter).
-            # pack padx=(9, 6) + frame border 1 + label padx 4 reproduces
-            # that exact left edge for every line of every row.  With the
-            # screen-wide 24 px left gap (list frame starts at 36 → canvas
-            # inset 9), padx=(9, 6) puts row text back on the 24 px line.
-            row.pack(fill="x", padx=(9, 6), pady=3)
+            # Rows fill the list pane edge-to-edge: the CTkScrollableFrame
+            # canvas insets children by (corner_radius + border_width) px on
+            # the left and reserves the same width for the scrollbar column
+            # on the right; packing with that value as padx puts rows exactly
+            # on both pane borders (uniform left/right gaps inside the pane).
+            row.pack(fill="x", padx=self._row_padx(), pady=3)
             # Make the whole card clickable like the old button rows.
             row.bind("<Button-1>", lambda _e, nid=note.id: self._select(nid))
             for child in row.winfo_children():
@@ -393,10 +407,12 @@ class NotesScreen(BaseScreen):
         self.delete_button.pack(side="left", padx=pad)
 
         self.detail_title.grid(row=0, column=0, sticky="ew",
-                               padx=24, pady=(14, 6))
-        # padx=8 matches the textbox's internal 8 px text inset so the body
-        # text starts on the same left edge as the title (see __init__).
-        self.detail_body.grid(row=1, column=0, sticky="nsew", padx=8)
+                               padx=CARD_PAD_X, pady=(14, 6))
+        # Outer padx = CARD_PAD_X minus the textbox's internal 8 px text
+        # inset so the body text starts on the same left edge as the title
+        # (see __init__).
+        self.detail_body.grid(row=1, column=0, sticky="nsew",
+                              padx=max(0, CARD_PAD_X - 8))
 
         self.detail_title.configure(text=note.display_title())
 

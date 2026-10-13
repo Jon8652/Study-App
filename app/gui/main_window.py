@@ -149,8 +149,13 @@ class MainWindow(ctk.CTk):
             font=ctk.CTkFont(size=10), text_color=("gray55", "gray45"),
         ).pack(side="bottom", pady=(0, 12))
 
+        # Symmetric insets so the screen's left and right outer gaps match:
+        # the content area sits 8 px from the window edge on both sides, and
+        # BaseScreen adds SCREEN_PAD_X (12) inside it — 20 px each side for
+        # every screen.  (The asymmetric (0, 8) used to make the right gap
+        # larger than the left one.)
         self.content_area = ctk.CTkFrame(self, corner_radius=0, fg_color="transparent")
-        self.content_area.grid(row=0, column=1, sticky="nsew", padx=(0, 8), pady=8)
+        self.content_area.grid(row=0, column=1, sticky="nsew", padx=8, pady=8)
         self.content_area.grid_rowconfigure(0, weight=1)
         self.content_area.grid_columnconfigure(0, weight=1)
 
