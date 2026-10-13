@@ -41,11 +41,16 @@ DANGER = ("#8b3030", "#b04040")
 DANGER_HOVER = ("#a33d3d", "#c44e4e")
 
 # --- Surfaces ------------------------------------------------------------------
-CARD_FG = ("#fbfcfd", "#242430")   # CTk default-ish panel colours
-BORDER = ("#dde2e8", "#3f3f50")    # subtle outline that separates cards
+# Light mode uses a coherent *blue* palette end-to-end: the window background
+# itself is a very pale blue (no neutral greys anywhere), panels are a slightly
+# deeper pale blue, and the sidebar/chips step progressively darker.  Dark mode
+# mirrors this with deep navy surfaces.
+WINDOW_BG = ("#eef4fb", "#15151f")
+CARD_FG = ("#f6f9fd", "#242430")   # elevated panel surface (pale blue in light)
+BORDER = ("#d6e2ef", "#3f3f50")    # subtle blue-tinted outline that separates cards
 NAV_ACTIVE_BG = ("#dbe7f5", "#2b6cb0")
-NAV_HOVER = ("#edf1f5", "#33333d")
-SIDEBAR_FG = ("#f2f4f8", "#1d1d28")
+NAV_HOVER = ("#e6eef7", "#33333d")
+SIDEBAR_FG = ("#e3ecf6", "#1d1d28")
 MUTED_TEXT = ("gray40", "gray65")
 
 # --- Notes screen surfaces -----------------------------------------------------
