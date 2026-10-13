@@ -7,9 +7,9 @@ notes also appear on that day in the Calendar and in the day-details
 dialog.
 
 Layout: list of notes on the left (with search + New note button), full
-text of the selected note on the right with Edit / Delete actions; the
-note's day and "Updated …" timestamp appear at the bottom-right of the
-detail pane, next to the Delete button.
+text of the selected note on the right with Edit / Delete / Open day
+actions; only the "Updated …" timestamp appears at the bottom-right of
+the detail pane (the note's day is shown in the list row instead).
 """
 
 from __future__ import annotations
@@ -33,7 +33,6 @@ from app.gui.theme import (
     danger_button,
     neutral_button,
 )
-from app.utils.date_utils import format_date_long
 
 # Note-row fills: selected rows get a tinted accent background in dark mode
 # and a soft blue in light mode, so selection reads clearly in both themes.
@@ -132,28 +131,49 @@ class NotesScreen(BaseScreen):
 
         actions = ctk.CTkFrame(self.detail_frame, fg_color="transparent")
         actions.grid(row=2, column=0, sticky="ew", padx=24, pady=(10, 14))
-        self.edit_button = ctk.CTkButton(actions, text="Edit note", width=110,
-                                         height=32, corner_radius=8,
-                                         command=self._edit_selected)
-        # Buttons are solid filled controls: their *background* (not the
-        # inset text) should start at the card's 24 px content edge, like
-        # the "+ New note" button in the toolbar above.
-        self.edit_button.pack(side="left", padx=(0, 8))
-        self.delete_button = danger_button(
-            actions, text="Delete", width=90, height=32,
-            command=self._delete_selected)
-        self.delete_button.pack(side="left")
-        self.open_day_button = neutral_button(
-            actions, text="Open day", width=100, height=32,
-            command=self._open_day_of_selected)
-        # Date / "Updated …" info sits at the bottom-right of the action
-        # row (next to Delete) instead of under the title, where it used to
-        # collide with long wrapped titles.
+        # Uniform gap between all action buttons (Edit / Delete / Open day).
+        self._ACTION_GAP = 8
+
+        def _gap_button(factory, **kwargs):
+            """Build a themed button packed with *symmetric* padding.
+
+            pack() reserves a side gap even when no widget is packed on
+            that side, so an asymmetric padx like (0, 8) shifts the whole
+            button group right whenever the last slot (Open day) is
+            hidden — which made the detail pane's minimum width, and hence
+            the list/detail split, differ per selected note.  With
+            half-gaps on both sides the total reserved pad is constant
+            (N x gap for N buttons), so the group position stays stable
+            whichever buttons are visible and the spacing between any two
+            adjacent buttons is exactly `self._ACTION_GAP`.
+            """
+            btn = factory(actions, height=32, corner_radius=8, **kwargs)
+            btn.pack(side="left",
+                     padx=(self._ACTION_GAP // 2, self._ACTION_GAP -
+                           self._ACTION_GAP // 2))
+            return btn
+
+        self.edit_button = _gap_button(ctk.CTkButton, text="Edit note",
+                                       width=110, command=self._edit_selected)
+        self.delete_button = _gap_button(danger_button, text="Delete",
+                                         width=90, command=self._delete_selected)
+        self.open_day_button = _gap_button(neutral_button, text="Open day",
+                                           width=100,
+                                           command=self._open_day_of_selected)
+        # "Updated …" info sits at the bottom-right of the action row
+        # (next to the buttons).  The note's day is deliberately NOT shown
+        # here: its long formatted date ("Monday, 12 October 2026 · Updated
+        # …") made this label ~70 px wider than the Edit/Delete/Open-day
+        # button group, so selecting a calendar-attached note squeezed the
+        # middle spacer and changed the apparent list/detail split.  The
+        # day already appears on the note's row in the list on the left.
         self.detail_meta = ctk.CTkLabel(
             actions, text="",
             font=ctk.CTkFont(size=12), anchor="e", justify="right",
             text_color=MUTED_TEXT,
         )
+        # Packed LAST (after all left-side buttons) so it only ever claims
+        # leftover space; see _render_detail for the full packing order.
         self.detail_meta.pack(side="right")
 
         self.detail_empty = self.show_empty_state(
@@ -360,19 +380,24 @@ class NotesScreen(BaseScreen):
 
         self.detail_empty.place_forget()
         self.detail_empty.grid_forget()
+        # Re-pack the action row in a fixed order on every render:
+        # Edit / Delete / [Open day] left-packed with identical symmetric
+        # half-gap padding (uniform spacing between the buttons), then the
+        # right-packed "Updated …" label LAST so it only claims leftover
+        # space.  A stable pack order keeps the row's requested width — and
+        # therefore the list/detail split — the same for calendar-attached
+        # and plain notes.
+        half = self._ACTION_GAP // 2
+        pad = (half, self._ACTION_GAP - half)
+        self.edit_button.pack(side="left", padx=pad)
+        self.delete_button.pack(side="left", padx=pad)
+
         self.detail_title.grid(row=0, column=0, sticky="ew",
                                padx=24, pady=(14, 6))
         # padx=8 matches the textbox's internal 8 px text inset so the body
         # text starts on the same left edge as the title (see __init__).
         self.detail_body.grid(row=1, column=0, sticky="nsew", padx=8)
 
-        meta_parts = []
-        if note.day is not None:
-            meta_parts.append(format_date_long(note.day))
-        meta_parts.append(
-            f"Updated {note.updated_at_local:%Y-%m-%d %H:%M}")
-        self.detail_meta.pack(side="right")
-        self.detail_meta.configure(text="   ·   ".join(meta_parts))
         self.detail_title.configure(text=note.display_title())
 
         self.detail_body.configure(state="normal")
@@ -386,9 +411,20 @@ class NotesScreen(BaseScreen):
         if note.day is not None:
             # NOTE: `side` is a pack option, not a grid option — passing it
             # to grid() raised TclError ("bad option -side") and broke note
-            # selection. The button lives inside the packed `actions` frame,
-            # so pack it like its siblings.
-            self.open_day_button.pack(side="left")
+            # selection.  Pack after Edit / Delete but BEFORE the meta
+            # label, with the same symmetric half-gap padding as its
+            # siblings, so the visual order stays
+            # Edit / Delete / Open day | Updated… and the spacing between
+            # the three buttons is uniformly _ACTION_GAP.
+            self.open_day_button.pack(side="left", padx=pad,
+                                      before=self.detail_meta)
             self.open_day_button.configure(state="normal")
         else:
             self.open_day_button.pack_forget()
+
+        # "Updated …" only (the day date was removed from this label):
+        # packed LAST in the fixed order above, so it always claims just
+        # the leftover space at the right edge of the action row.
+        self.detail_meta.pack(side="right")
+        self.detail_meta.configure(
+            text=f"Updated {note.updated_at_local:%Y-%m-%d %H:%M}")
