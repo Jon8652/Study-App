@@ -28,8 +28,6 @@ from app.gui.theme import (
     BORDER,
     CARD_FG,
     MUTED_TEXT,
-    NEUTRAL,
-    NEUTRAL_TEXT,
     danger_button,
     neutral_button,
 )

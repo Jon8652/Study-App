@@ -22,6 +22,7 @@ from app.gui.theme import (
     ACCENT_HOVER,
     MUTED_TEXT,
     NEUTRAL,
+    NEUTRAL_HOVER,
     NEUTRAL_TEXT,
     card,
     neutral_button,
@@ -65,7 +66,7 @@ class SettingsScreen(BaseScreen):
             command=lambda: self._set_theme("dark"))
         self.light_button = ctk.CTkButton(
             theme_row, text="Light", width=110, height=34, corner_radius=8,
-            fg_color=NEUTRAL, hover_color=NEUTRAL[1], text_color=NEUTRAL_TEXT,
+            fg_color=NEUTRAL, hover_color=NEUTRAL_HOVER, text_color=NEUTRAL_TEXT,
             command=lambda: self._set_theme("light"))
         self.dark_button.pack(side="left", padx=(0, 8))
         self.light_button.pack(side="left")
@@ -169,12 +170,12 @@ class SettingsScreen(BaseScreen):
         if theme == "dark":
             self.dark_button.configure(fg_color=ACCENT, hover_color=ACCENT_HOVER,
                                        text_color="white", text="Dark \u2713")
-            self.light_button.configure(fg_color=NEUTRAL, hover_color=NEUTRAL[1],
+            self.light_button.configure(fg_color=NEUTRAL, hover_color=NEUTRAL_HOVER,
                                          text_color=NEUTRAL_TEXT, text="Light")
         else:
             self.light_button.configure(fg_color=ACCENT, hover_color=ACCENT_HOVER,
                                         text_color="white", text="Light \u2713")
-            self.dark_button.configure(fg_color=NEUTRAL, hover_color=NEUTRAL[1],
+            self.dark_button.configure(fg_color=NEUTRAL, hover_color=NEUTRAL_HOVER,
                                        text_color=NEUTRAL_TEXT, text="Dark")
 
         session_count = len(self.state.dataset.sessions)

@@ -281,7 +281,10 @@ class CalendarScreen(BaseScreen):
                     hover_color=hover,
                     text_color=self._cell_text_color(is_plain),
                     border_width=2 if selected else 0,
-                    border_color=ACCENT if selected else "transparent",
+                    # NOTE: customtkinter forbids the literal "transparent" for
+                    # border_color (raises ValueError); a theme-aware colour is
+                    # safe and invisible anyway while border_width is 0.
+                    border_color=ACCENT if selected else BORDER,
                     command=lambda d=day: self._open_day(d),
                 )
                 cell._is_day_cell = True
