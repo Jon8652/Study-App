@@ -52,6 +52,10 @@ NAV_ACTIVE_BG = ("#dbe7f5", "#2b6cb0")
 NAV_HOVER = ("#e6eef7", "#33333d")
 SIDEBAR_FG = ("#e3ecf6", "#1d1d28")
 MUTED_TEXT = ("gray40", "gray65")
+# High-contrast body text for content shown on card surfaces (e.g. the session
+# rows in the day-details dialog).  Light mode keeps near-black; dark mode uses
+# white so the text stays readable instead of the default light grey.
+PRIMARY_TEXT = ("gray10", "white")
 
 # --- Notes screen surfaces -----------------------------------------------------
 # The right-hand detail card sits on a soft blue (a slightly deeper tint of the
